@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BloodTransport</title>
+    <style>
+        body { margin: 0; background: #f5f6fa; color: #202638; font: 1rem system-ui; }
+        main { max-width: 36rem; margin: 3rem auto; padding: 0 1rem; }
+        form, section { background: white; padding: 1.5rem; border-radius: .75rem; }
+        section { margin-top: 1rem; }
+        label { display: grid; gap: .35rem; margin-bottom: 1rem; }
+        input, button { padding: .65rem; font: inherit; border-radius: .35rem; }
+        input { border: 1px solid #81889a; }
+        button { border: 0; background: #243b78; color: white; cursor: pointer; }
+        #error { color: #a52036; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>BloodTransport</h1>
+    <form id="request-form">
+        <h2>Заявка на перевозку</h2>
+        <label>Код образца <input name="sample_code" required></label>
+        <label>Откуда <input name="origin" required></label>
+        <label>Куда <input name="destination" required></label>
+        <button type="submit">Создать заявку</button>
+        <p id="error" role="alert" hidden></p>
+    </form>
+    <section aria-labelledby="requests-heading">
+        <h2 id="requests-heading">Заявки на этой странице</h2>
+        <p id="empty">Пока нет заявок.</p>
+        <ul id="requests" aria-live="polite"></ul>
+    </section>
+</main>
+<script>
+    const form = document.querySelector("#request-form");
+    const button = form.querySelector("button");
+    const error = document.querySelector("#error");
+    const requests = document.querySelector("#requests");
+    const empty = document.querySelector("#empty");
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        error.hidden = true;
+
+        try {
+            const response = await fetch("/api/transport-requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(Object.fromEntries(new FormData(form))),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                error.textContent = result.error === "Origin and destination must differ."
+                    ? "Пункты отправления и назначения должны отличаться."
+                    : "Проверь, что все поля заполнены.";
+                error.hidden = false;
+                return;
+            }
+
+            const item = document.createElement("li");
+            item.textContent =
+                `${result.sample_code} · ${result.origin} → ${result.destination} · Новая`;
+            requests.prepend(item);
+            empty.hidden = true;
+            form.reset();
+        } catch {
+            error.textContent = "Не удалось получить ответ от сервера.";
+            error.hidden = false;
+        } finally {
+            button.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>
