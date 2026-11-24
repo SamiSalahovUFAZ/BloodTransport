@@ -1,11 +1,17 @@
+from pathlib import Path
 from uuid import uuid4
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 
-def create_app():
+from .repository import TransportRequestRepository
+
+
+def create_app(database_path=None):
     app = Flask(__name__)
-    transport_requests = {}
+    if database_path is None:
+        database_path = Path(app.instance_path) / "transport.sqlite3"
+    repository = TransportRequestRepository(database_path)
 
     @app.get("/health")
     def health():
@@ -35,15 +41,19 @@ def create_app():
             **details,
             "status": "pending",
         }
-        transport_requests[request_id] = transport_request
+        repository.save(transport_request)
         return jsonify(transport_request), 201
 
     @app.get("/api/transport-requests/<request_id>")
     def get_transport_request(request_id):
-        transport_request = transport_requests.get(request_id)
+        transport_request = repository.get(request_id)
         if transport_request is None:
             return jsonify(error="Transport request not found."), 404
         return jsonify(transport_request)
+
+    @app.get("/")
+    def index():
+        return render_template("index.html")
 
     return app
 
