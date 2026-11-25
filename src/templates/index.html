@@ -12,11 +12,11 @@
     </section>
 
     <section class="summary-grid" aria-label="Request summary">
-        <div class="summary-item"><span>All requests</span><strong id="total-count">—</strong></div>
-        <div class="summary-item"><span>In transit</span><strong id="transit-count">—</strong></div>
-        <div class="summary-item attention"><span>Overdue</span><strong id="overdue-count">—</strong></div>
-        <div class="summary-item"><span>Open issues</span><strong id="issues-count">—</strong></div>
-        <div class="summary-item complete"><span>Received</span><strong id="received-count">—</strong></div>
+        <button type="button" class="summary-item stage-tile" data-queue-status="" aria-pressed="true"><span>All requests</span><strong id="total-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile" data-queue-status="picked_up" aria-pressed="false"><span>In transit</span><strong id="transit-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile attention" data-queue-status="overdue" aria-pressed="false"><span>Overdue</span><strong id="overdue-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile" data-queue-status="issues" aria-pressed="false"><span>Open issues</span><strong id="issues-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile complete" data-queue-status="received" aria-pressed="false"><span>Received</span><strong id="received-count">—</strong></button>
     </section>
 
     <section class="queue" aria-labelledby="queue-heading">

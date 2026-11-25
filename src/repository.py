@@ -2,6 +2,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+from .transport_events import TransportEvent, publish_transport_event
 
 class TransportRequestRepository:
     def __init__(self, database_path):
@@ -104,17 +105,10 @@ class TransportRequestRepository:
             """, {**details, "id": current["id"], "revision": current["revision"]})
             if result.rowcount != 1:
                 return False
-            self._record_history(
-                connection, current["id"], current["status"], current["status"], actor, "Request details updated",
-            )
+            publish_transport_event(connection, TransportEvent(
+                current["id"], current["status"], current["status"], actor, note="Request details updated",
+            ))
             return True
-
-    @staticmethod
-    def _record_history(connection, request_id, previous_status, status, actor, note):
-        connection.execute("""
-            INSERT INTO transport_history (request_id, previous_status, status, actor, note)
-            VALUES (?, ?, ?, ?, ?)
-        """, (request_id, previous_status, status, actor, note))
 
     def get(self, request_id):
         with closing(sqlite3.connect(self.database_path)) as connection:
@@ -159,12 +153,9 @@ class TransportRequestRepository:
             if result.rowcount != 1:
                 return None
 
-            self._record_history(connection, request_id, current["status"], status, actor, note)
-            if receipt_condition == "issue":
-                connection.execute("""
-                    INSERT INTO transport_incidents (request_id, description, reported_by)
-                    VALUES (?, ?, ?)
-                """, (request_id, receipt_note, actor))
+            publish_transport_event(connection, TransportEvent(
+                request_id, current["status"], status, actor, note, receipt_condition, receipt_note,
+            ))
 
             row = connection.execute(
                 "SELECT * FROM transport_requests WHERE id = ?", (request_id,)

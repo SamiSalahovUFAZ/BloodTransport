@@ -210,3 +210,32 @@ textarea { resize: vertical; }
 @media (max-width: 52rem) {
     .queue-filters, .queue-filters.role-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.workspace-header { background: #101f34; color: #f7faff; border-color: #263a54; }
+.workspace-nav { background: #1b304a; }
+.workspace-nav a[aria-current="page"] { color: #e4eefc; background: transparent; box-shadow: none; }
+.workspace-dot { display: inline-block; width: .45rem; height: .45rem; margin-inline-end: .45rem; border-radius: 50%; background: #84b8df; vertical-align: .13rem; }
+.account-name { color: #e0eaf5; }
+.account-avatar { display: grid; flex: 0 0 auto; place-items: center; width: 2rem; height: 2rem; border: 1px solid #47677f; border-radius: 50%; background: #233f5b; color: #e3edf7; font-size: .7rem; font-weight: 750; }
+.account-bar button.secondary { border-color: #60748c; background: transparent; color: #edf5ff; }
+.account-bar button.secondary:not(:disabled):hover { background: #263d58; }
+.operations-heading { position: relative; isolation: isolate; overflow: hidden; min-height: 11.5rem; padding: clamp(1.25rem, 4vw, 2.4rem); align-items: center; color: #f6faff; background: radial-gradient(ellipse at 87% 15%, #245478, transparent 60%), #142941; border-radius: 1.2rem; }
+.operations-heading::after { content: ""; position: absolute; z-index: -1; top: -9rem; right: -2rem; width: 27rem; aspect-ratio: 1; border-radius: 50%; border: 1px solid #b9dfff40; box-shadow: 0 0 0 2.7rem #b9dfff13, 0 0 0 5.4rem #b9dfff0c; pointer-events: none; }
+.operations-heading h1 { margin-bottom: .5rem; }
+.operations-heading p { color: #d2e1ef; }
+.operations-heading .section-label { color: #b9defa; }
+.operations-heading .primary-action, .operations-heading button.secondary { background: #e3f0ff; color: #142e49; border-color: #93bcdf; }
+.operations-heading button:not(:disabled):hover { background: #fff; color: #142e49; }
+.summary-item { min-height: 5.15rem; }
+.summary-item.stage-tile[aria-pressed="true"] { border-color: #648daa; box-shadow: inset 0 0 0 1px #648daa; }
+.auth-intro { background: radial-gradient(ellipse at 100% 0, #37607a, transparent 65%), radial-gradient(ellipse at 0 100%, #3b405f, transparent 62%), #152a40; }
+.handoffs li { justify-content: space-between; flex-wrap: wrap; gap: .25rem .8rem; }
+.handoffs span { color: #d0e3f4; font-weight: 400; }
+@media (max-width: 46rem) {
+    .workspace-nav { width: 100%; }
+    .operations-heading { align-items: flex-start; min-height: 0; }
+}
+@media (max-width: 38rem) {
+    .account-avatar { display: none; }
+    .plan-fields { grid-template-columns: 1fr; }
+}

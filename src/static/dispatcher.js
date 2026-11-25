@@ -12,6 +12,12 @@ const statusLabels = {
 const priorityLabels = { critical: "Critical", urgent: "Urgent", standard: "Standard" };
 const sampleTypeLabels = JSON.parse(byId("sample-type-labels").textContent);
 const priorityRank = { critical: 0, urgent: 1, standard: 2 };
+const deadlineRank = (job) => job.due_at ? Date.parse(job.due_at) : Infinity;
+const queueOrdering = {
+    newest: (jobs) => jobs,
+    priority: (jobs) => jobs.sort((a, b) => (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2)),
+    deadline: (jobs) => jobs.sort((a, b) => deadlineRank(a) - deadlineRank(b)),
+};
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 const requestDialog = byId("request-dialog");
 const assignDialog = byId("assign-dialog");
@@ -130,12 +136,7 @@ function filterRequests() {
         if (status === "issues") return job.open_incidents > 0;
         return !status || job.status === status;
     });
-    if (order === "priority") {
-        matches.sort((a, b) => (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2));
-    } else if (order === "deadline") {
-        matches.sort((a, b) => (a.due_at ? Date.parse(a.due_at) : Infinity) - (b.due_at ? Date.parse(b.due_at) : Infinity));
-    }
-    return matches;
+    return queueOrdering[order](matches);
 }
 
 function renderQueue() {
@@ -146,6 +147,9 @@ function renderQueue() {
     byId("empty").textContent = requests.length ? "No requests match these filters." : "No requests yet. Create your first transport request.";
     byId("result-count").textContent = visibleRequests.length + " of " + requests.length + " requests";
     byId("export").disabled = !visibleRequests.length;
+    document.querySelectorAll("[data-queue-status]").forEach((tile) => {
+        tile.setAttribute("aria-pressed", String(tile.dataset.queueStatus === byId("status-filter").value));
+    });
 }
 
 async function refreshQueue() {
@@ -313,12 +317,16 @@ function csvCell(value) {
     return '"' + safe.replaceAll('"', '""') + '"';
 }
 
-function downloadCsv() {
+function requestsToCsv(jobs) {
     const lines = [["Sample code", "Sample type", "Pickup", "Destination", "Status", "Courier", "Priority", "Deadline (UTC)", "Open issues"]];
-    for (const job of visibleRequests) {
+    for (const job of jobs) {
         lines.push([job.sample_code, sampleTypeLabels[job.sample_type], job.origin, job.destination, statusLabels[job.status], job.courier_name, job.priority, job.due_at, job.open_incidents]);
     }
-    const file = new Blob([lines.map((line) => line.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    return lines.map((line) => line.map(csvCell).join(",")).join("\r\n");
+}
+
+function downloadCsv() {
+    const file = new Blob([requestsToCsv(visibleRequests)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(file);
     const link = element("a");
     link.href = url;
@@ -365,6 +373,10 @@ formHandler(byId("incident-form"), async (data) => {
     await Promise.all([refreshQueue(), refreshDetails(requestId)]);
 });
 byId("search").addEventListener("input", renderQueue);
+document.querySelectorAll("[data-queue-status]").forEach((tile) => tile.addEventListener("click", () => {
+    byId("status-filter").value = tile.dataset.queueStatus;
+    renderQueue();
+}));
 for (const id of ["sample-type-filter", "status-filter", "priority-filter", "sort"]) byId(id).addEventListener("change", renderQueue);
 byId("refresh").addEventListener("click", refreshQueue);
 byId("export").addEventListener("click", downloadCsv);

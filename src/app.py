@@ -9,9 +9,7 @@ from .accounts import AccountRepository
 from .auth import add_auth
 from .repository import TransportRequestRepository
 from .roles import SAMPLE_TYPES, can_view, role_required
-
-
-EDITABLE_STAGES = {"pending", "assigned"}
+from .workflow import EDITABLE_STAGES, allows_transition
 
 
 def read_plan(data):
@@ -66,13 +64,6 @@ def create_app(database_path=None):
     )
     add_auth(app, accounts)
     app.jinja_env.globals["sample_types"] = SAMPLE_TYPES
-
-    next_status = {
-        "pending": "assigned",
-        "assigned": "picked_up",
-        "picked_up": "delivered",
-        "delivered": "received",
-    }
 
     @app.get("/health")
     def health():
@@ -134,8 +125,7 @@ def create_app(database_path=None):
         if revision is not None and revision != current["revision"]:
             return jsonify(error="This request changed. Refresh the list."), 409
 
-        planning_change = status in ("assigned", "cancelled") and current["status"] in EDITABLE_STAGES
-        if not planning_change and next_status.get(current["status"]) != status:
+        if not allows_transition(current["status"], status):
             return jsonify(error="Invalid status transition."), 409
 
         updated = repository.change_status(

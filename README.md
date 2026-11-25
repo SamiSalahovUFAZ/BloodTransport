@@ -39,3 +39,16 @@ Each signed-in account opens its own workspace. The API enforces the role and li
 | `DATABASE_PATH` | Override the persistent SQLite file location. |
 | `SECRET_KEY` | Set a session signing key. The app creates and persists a local fallback when this variable is unset. |
 | `SESSION_COOKIE_SECURE` | Set to `1` when serving the app over HTTPS. |
+
+## Docker and course documentation
+
+```bash
+docker compose up --build --detach --wait
+curl -f http://127.0.0.1:5002/health
+docker compose down
+```
+
+Compose stores the SQLite database in a named volume. Install `requirements-dev.txt` before running `make check PYTHON=.venv/bin/python`.
+
+- [Technical specification and design patterns](docs/TECH_TASK.md)
+- [PW1–PW8, CI/CD, monitoring and rollback](docs/OPERATIONS.md)
