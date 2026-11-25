@@ -7,6 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 
 USERNAME = re.compile(r"[A-Za-z0-9_.-]{3,32}")
+PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000000"
 PUBLIC_ENDPOINTS = {"health", "static", "auth.login", "auth.register"}
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
@@ -19,7 +20,7 @@ def csrf_token():
 
 def add_auth(app, accounts):
     auth = Blueprint("auth", __name__)
-    missing_account_hash = generate_password_hash(token_urlsafe(32))
+    missing_account_hash = generate_password_hash(token_urlsafe(32), method=PASSWORD_HASH_METHOD)
     app.jinja_env.globals["csrf_token"] = csrf_token
 
     @app.before_request
@@ -89,7 +90,7 @@ def add_auth(app, accounts):
             error = "Choose a password with 10–128 characters."
         elif password != request.form.get("confirm_password"):
             error = "The passwords do not match."
-        elif accounts.create(username, generate_password_hash(password)):
+        elif accounts.create(username, generate_password_hash(password, method=PASSWORD_HASH_METHOD)):
             return sign_in(username)
         else:
             error = "That username is already in use."

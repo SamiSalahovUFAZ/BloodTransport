@@ -1,3 +1,4 @@
+import hashlib
 import sqlite3
 from contextlib import closing
 
@@ -10,7 +11,8 @@ def get_token(client, page):
         return session["csrf_token"]
 
 
-def test_account_registration_login_and_logout(tmp_path):
+def test_account_registration_login_and_logout_without_scrypt(tmp_path, monkeypatch):
+    monkeypatch.delattr(hashlib, "scrypt", raising=False)
     database = tmp_path / "transport.sqlite3"
     client = create_app(database).test_client()
     assert client.get("/courier").location == "/login"
@@ -30,7 +32,7 @@ def test_account_registration_login_and_logout(tmp_path):
 
     with closing(sqlite3.connect(database)) as connection:
         (password_hash,) = connection.execute("SELECT password_hash FROM accounts").fetchone()
-    assert "scrypt:" in password_hash and password not in password_hash
+    assert password_hash.startswith("pbkdf2:sha256:") and password not in password_hash
 
     assert client.post("/logout").status_code == 400
     client.get("/")
