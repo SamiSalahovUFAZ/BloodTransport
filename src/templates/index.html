@@ -8,8 +8,10 @@
         * { box-sizing: border-box; }
         body { margin: 0; background: #f4f6fa; color: #202b3c; font: 1rem/1.5 system-ui, sans-serif; }
         header { background: #172842; color: white; padding: 1.5rem 0; border-bottom: 4px solid #dc6678; }
-        header h1, main { width: min(68rem, calc(100% - 2rem)); margin-inline: auto; }
-        header h1 { margin-block: 0; font-size: 1.65rem; }
+        header nav, main { width: min(68rem, calc(100% - 2rem)); margin-inline: auto; }
+        header nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+        header h1 { margin: 0; font-size: 1.65rem; }
+        header a { color: inherit; }
         main { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.7fr); align-items: start; gap: 1.5rem; padding-block: 2rem; }
         .panel, .card, dialog { border: 1px solid #dce3ec; border-radius: 1rem; background: white; padding: 1.25rem; }
         h2 { margin: 0 0 1rem; font-size: 1.25rem; }
@@ -42,7 +44,12 @@
     </style>
 </head>
 <body>
-    <header><h1>BloodTransport</h1></header>
+    <header>
+        <nav aria-label="Dashboards">
+            <h1>BloodTransport</h1>
+            <a href="{{ url_for('courier_dashboard') }}">Courier dashboard</a>
+        </nav>
+    </header>
 
     <main>
         <form id="request-form" class="panel">
