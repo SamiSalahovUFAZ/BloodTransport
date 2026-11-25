@@ -21,6 +21,8 @@ Open [http://127.0.0.1:5001/](http://127.0.0.1:5001/) and choose **Create an acc
 
 The dispatcher dashboard includes a summary of transport activity, search and filters, optional delivery deadlines, and CSV export of the current view. Open a request's details to see status changes, report an issue, or resolve a reported issue.
 
+The request form also records container count, scheduled pickup, pickup and delivery contacts, and handoff instructions. Dispatchers can edit, reassign, or cancel a request before pickup. Cancellation requires a reason. Couriers can add a note when recording pickup or delivery, and all three teams can review the handoff history for requests they can access.
+
 Each signed-in account opens its own workspace. The API enforces the role and limits courier and laboratory records to their assignments and registered destinations. Existing accounts choose their role once at sign-in. Registration is self-service for the classroom demo, so role and laboratory ownership are not verified.
 
 ## Tests

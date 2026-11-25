@@ -42,6 +42,7 @@
                     <option value="picked_up">In transit</option>
                     <option value="delivered">Delivered</option>
                     <option value="received">Received</option>
+                    <option value="cancelled">Cancelled</option>
                     <option value="overdue">Overdue</option>
                     <option value="issues">Has open issues</option>
                 </select>
@@ -74,7 +75,7 @@
     </section>
 </main>
 
-<dialog id="request-dialog" aria-labelledby="request-title">
+<dialog id="request-dialog" class="detail-dialog" aria-labelledby="request-title">
     <div class="dialog-heading"><h2 id="request-title">New transport request</h2><button type="button" data-close class="secondary">Close</button></div>
     <form id="request-form" class="dialog-form">
         <label>Sample code <input name="sample_code" maxlength="100" required></label>
@@ -82,12 +83,19 @@
         <label>Delivery location <input name="destination" list="laboratories" maxlength="100" required></label>
         <datalist id="laboratories">{% for laboratory in directory.laboratories %}<option value="{{ laboratory }}">{% endfor %}</datalist>
         <label>Sample type
-            <select name="sample_type" required><option value="">Choose type</option>{% for key, label in sample_types.items() if key != 'unspecified' %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+            <select name="sample_type" required><option value="">Choose type</option>{% for key, label in sample_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
         </label>
         <label>Priority
             <select name="priority"><option value="standard">Standard</option><option value="urgent">Urgent</option><option value="critical">Critical</option></select>
         </label>
-        <label>Delivery deadline <input name="due_at" type="datetime-local"></label>
+        <fieldset class="plan-fields"><legend>Pickup and delivery</legend>
+            <label>Container count <input name="container_count" type="number" min="1" max="999" value="1" required></label>
+            <label>Scheduled pickup <input name="pickup_at" type="datetime-local"></label>
+            <label>Delivery deadline <input name="due_at" type="datetime-local"></label>
+            <label>Pickup contact <input name="pickup_contact" maxlength="100" placeholder="Team or desk"></label>
+            <label>Delivery contact <input name="delivery_contact" maxlength="100" placeholder="Team or desk"></label>
+        </fieldset>
+        <label>Handoff instructions <textarea name="instructions" rows="2" maxlength="1000" placeholder="Entrance, meeting point or handoff instructions"></textarea></label>
         <p class="error" data-error role="alert" hidden></p>
         <button type="submit">Create request</button>
     </form>
@@ -109,6 +117,11 @@
 <dialog id="details-dialog" class="detail-dialog" aria-labelledby="detail-heading">
     <div class="dialog-heading"><h2 id="detail-heading">Request details</h2><button type="button" data-close class="secondary">Close</button></div>
     <p id="detail-route" class="muted"></p>
+    <dl id="detail-plan" class="role-facts"></dl>
+    <form id="cancel-form" class="dialog-form receipt-panel" hidden>
+        <label>Cancellation reason <input name="reason" maxlength="500" required></label>
+        <button type="submit" class="secondary">Cancel transport</button>
+    </form>
     <p id="detail-feedback" role="status"></p>
     <p id="detail-error" class="error" role="alert" hidden></p>
     <div class="detail-grid">

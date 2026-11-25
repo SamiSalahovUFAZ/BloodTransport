@@ -11,6 +11,48 @@ from .repository import TransportRequestRepository
 from .roles import SAMPLE_TYPES, can_view, role_required
 
 
+EDITABLE_STAGES = {"pending", "assigned"}
+
+
+def read_plan(data):
+    plan = {}
+    for field in ("sample_code", "origin", "destination", "pickup_contact", "delivery_contact", "instructions"):
+        required = field in ("sample_code", "origin", "destination")
+        value = data.get(field, "")
+        limit = 1000 if field == "instructions" else 100
+        if not isinstance(value, str) or not int(required) <= len(value.strip()) <= limit:
+            raise ValueError(f"{field.replace('_', ' ').capitalize()} must contain {int(required)}–{limit} characters.")
+        plan[field] = value.strip()
+    if plan["origin"].casefold() == plan["destination"].casefold():
+        raise ValueError("Origin and destination must differ.")
+
+    for field, default, choices in (
+        ("priority", "standard", ("standard", "urgent", "critical")),
+        ("sample_type", "unspecified", tuple(SAMPLE_TYPES)),
+    ):
+        value = data.get(field, default)
+        if value not in choices:
+            raise ValueError(f"Choose a valid {field.replace('_', ' ')}.")
+        plan[field] = value
+    count = data.get("container_count", 1)
+    if type(count) is not int or not 1 <= count <= 999:
+        raise ValueError("Container count must be a whole number from 1 to 999.")
+    plan["container_count"] = count
+
+    for field in ("pickup_at", "due_at"):
+        value = data.get(field)
+        try:
+            timestamp = datetime.fromisoformat(value.replace("Z", "+00:00")) if value is not None else None
+            if timestamp is not None and timestamp.utcoffset() is None:
+                raise ValueError
+            plan[field] = timestamp.astimezone(timezone.utc).isoformat(timespec="seconds") if timestamp else None
+        except (AttributeError, ValueError, OverflowError):
+            raise ValueError("Pickup and delivery times must include a valid time and time zone.") from None
+    if plan["pickup_at"] and plan["due_at"] and plan["pickup_at"] > plan["due_at"]:
+        raise ValueError("Scheduled pickup must be before or at the delivery deadline.")
+    return plan
+
+
 def create_app(database_path=None):
     app = Flask(__name__)
     if database_path is None:
@@ -51,58 +93,53 @@ def create_app(database_path=None):
         if not isinstance(data, dict):
             return jsonify(error="Provide a JSON object."), 400
 
-        details = {}
-        for field in ("sample_code", "origin", "destination"):
-            value = data.get(field)
-            if not isinstance(value, str) or not 1 <= len(value.strip()) <= 100:
-                return jsonify(error=f"{field} must contain 1–100 characters."), 400
-            details[field] = value.strip()
-
-        if details["origin"].casefold() == details["destination"].casefold():
-            return jsonify(error="Origin and destination must differ."), 400
-
-        priority = data.get("priority", "standard")
-        if priority not in ("standard", "urgent", "critical"):
-            return jsonify(error="Choose a valid priority."), 400
-        sample_type = data.get("sample_type", "unspecified")
-        if not isinstance(sample_type, str) or sample_type not in SAMPLE_TYPES:
-            return jsonify(error="Choose a valid sample type."), 400
-
-        due_at = data.get("due_at")
-        if due_at is not None:
-            if not isinstance(due_at, str):
-                return jsonify(error="Delivery deadline must include a time zone."), 400
-            try:
-                deadline = datetime.fromisoformat(due_at.replace("Z", "+00:00"))
-                if deadline.utcoffset() is None:
-                    raise ValueError("No time zone")
-                due_at = deadline.astimezone(timezone.utc).isoformat(timespec="seconds")
-            except (ValueError, OverflowError):
-                return jsonify(error="Delivery deadline must include a valid time and time zone."), 400
+        try:
+            details = read_plan(data)
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
 
         transport_request = {
             "id": str(uuid4()),
             **details,
             "status": "pending",
-            "priority": priority,
-            "due_at": due_at,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "sample_type": sample_type,
+            "revision": 0,
         }
         repository.save(transport_request)
         return jsonify(transport_request), 201
 
-    def apply_status_change(request_id, status, **details):
+    @app.patch("/api/transport-requests/<request_id>")
+    @role_required("dispatcher")
+    def edit_transport_request(request_id):
+        current = repository.get(request_id)
+        if current is None:
+            return jsonify(error="Transport request not found."), 404
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(error="Provide a JSON object."), 400
+        if current["status"] not in EDITABLE_STAGES or data.get("revision") != current["revision"]:
+            return jsonify(error="This request changed or can no longer be edited. Refresh the list."), 409
+        try:
+            plan = read_plan(data)
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        if not repository.update_plan(current, plan, g.account["username"]):
+            return jsonify(error="This request changed. Refresh the list."), 409
+        return jsonify(updated=True)
+
+    def apply_status_change(request_id, status, *, revision=None, **details):
         current = visible_job(request_id)
         if current is None:
             return jsonify(error="Transport request not found."), 404
+        if revision is not None and revision != current["revision"]:
+            return jsonify(error="This request changed. Refresh the list."), 409
 
-        if next_status.get(current["status"]) != status:
+        planning_change = status in ("assigned", "cancelled") and current["status"] in EDITABLE_STAGES
+        if not planning_change and next_status.get(current["status"]) != status:
             return jsonify(error="Invalid status transition."), 409
 
         updated = repository.change_status(
-            request_id,
-            current["status"],
+            current,
             status,
             g.account["username"],
             **details,
@@ -111,6 +148,17 @@ def create_app(database_path=None):
             return jsonify(error="Status changed. Reload the request and retry."), 409
 
         return jsonify(updated)
+
+    @app.post("/api/transport-requests/<request_id>/cancel")
+    @role_required("dispatcher")
+    def cancel_transport_request(request_id):
+        data = request.get_json(silent=True)
+        reason = data.get("reason") if isinstance(data, dict) else None
+        if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 500:
+            return jsonify(error="Enter a cancellation reason of 1–500 characters."), 400
+        return apply_status_change(
+            request_id, "cancelled", revision=data.get("revision"), note="Cancelled: " + reason.strip(),
+        )
 
     @app.post("/api/transport-requests/<request_id>/assign")
     @role_required("dispatcher")
@@ -127,7 +175,9 @@ def create_app(database_path=None):
         return apply_status_change(
             request_id,
             "assigned",
+            revision=data.get("revision"),
             courier_name=courier["username"],
+            note="Courier: " + courier["username"],
         )
 
     @app.patch("/api/transport-requests/<request_id>/status")
@@ -141,7 +191,10 @@ def create_app(database_path=None):
         if status not in ("picked_up", "delivered"):
             return jsonify(error="Couriers can record pickup or delivery."), 400
 
-        return apply_status_change(request_id, status)
+        note = data.get("note", "")
+        if not isinstance(note, str) or len(note.strip()) > 500:
+            return jsonify(error="Enter a handoff note of up to 500 characters."), 400
+        return apply_status_change(request_id, status, revision=data.get("revision"), note=note.strip() or None)
 
     @app.post("/api/transport-requests/<request_id>/receipt")
     @role_required("laboratory")

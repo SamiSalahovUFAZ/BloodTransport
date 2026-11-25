@@ -11,9 +11,10 @@ const stages = new Map([
     ["assigned", "Awaiting pickup"],
     ["pending", "Awaiting assignment"],
     ["received", "Received"],
+    ["cancelled", "Cancelled"],
 ]);
-const stageKeys = lab ? ["delivered", "picked_up", "assigned", "pending", "received"]
-    : ["assigned", "picked_up", "delivered", "received"];
+const stageKeys = lab ? ["delivered", "picked_up", "assigned", "pending", "received", "cancelled"]
+    : ["assigned", "picked_up", "delivered", "received", "cancelled"];
 const priorities = {critical: 0, urgent: 1, standard: 2};
 const time = new Intl.DateTimeFormat("en", {dateStyle: "medium", timeStyle: "short"});
 let jobs = [];
@@ -81,7 +82,9 @@ function renderCard(job) {
     const addFact = (label, value) => facts.append(node("dt", label), node("dd", value));
     addFact("Priority", (job.priority || "standard").replace(/^\w/, (s) => s.toUpperCase()));
     addFact("Deadline", stamp(job.due_at));
-    if (job.due_at && job.status !== "received" && Date.parse(job.due_at) < Date.now()) {
+    if (job.pickup_at) addFact("Scheduled pickup", stamp(job.pickup_at));
+    addFact("Containers", String(job.container_count));
+    if (job.due_at && !["received", "cancelled"].includes(job.status) && Date.parse(job.due_at) < Date.now()) {
         addFact("Schedule", "Overdue");
     }
     if (lab) addFact("Courier", job.courier_name || "Unassigned");
@@ -89,8 +92,8 @@ function renderCard(job) {
     if (job.receipt_condition) addFact("Receipt", job.receipt_condition === "issue" ? "Received with issue" : "Accepted");
     card.append(facts);
     const actions = node("div", "", "row-actions");
-    if (!lab && job.status === "assigned") actions.append(action("Mark as picked up", () => advance(job, "picked_up"), ""));
-    if (!lab && job.status === "picked_up") actions.append(action("Mark as delivered", () => advance(job, "delivered"), ""));
+    if (!lab && job.status === "assigned") actions.append(action("Mark as picked up", () => openDetails(job, true), ""));
+    if (!lab && job.status === "picked_up") actions.append(action("Mark as delivered", () => openDetails(job, true), ""));
     const view = action(lab && job.status === "delivered" ? "Review intake" : "View details", () => openDetails(job));
     actions.append(view);
     card.append(actions);
@@ -142,13 +145,6 @@ async function perform(work, error) {
     }
 }
 
-async function advance(job, status) {
-    await perform(async () => {
-        await api(endpoint + "/" + job.id + "/status", "PATCH", {status});
-        await refresh();
-    }, id("role-error"));
-}
-
 async function loadDetails() {
     const job = jobs.find((item) => item.id === selectedId);
     if (!job) return;
@@ -156,11 +152,27 @@ async function loadDetails() {
     const description = [types[job.sample_type], job.origin + " → " + job.destination, stages.get(job.status)];
     if (job.receipt_note) description.push("Receipt note: " + job.receipt_note);
     id("role-dialog-description").textContent = description.filter(Boolean).join(" · ");
+    const plan = [
+        ["Containers", String(job.container_count)],
+        ["Scheduled pickup", stamp(job.pickup_at)],
+        ["Delivery deadline", stamp(job.due_at)],
+        ["Pickup contact", job.pickup_contact],
+        ["Delivery contact", job.delivery_contact],
+        ["Handoff instructions", job.instructions],
+    ];
+    id("role-plan").replaceChildren(...plan.filter(([, value]) => value).flatMap(([label, value]) => [
+        node("dt", label), node("dd", value),
+    ]));
     if (lab) id("receipt-form").hidden = job.status !== "delivered";
+    else {
+        id("handoff-form").hidden = !["assigned", "picked_up"].includes(job.status);
+        id("handoff-submit").textContent = job.status === "assigned" ? "Confirm pickup" : "Confirm delivery";
+    }
     const data = await api(endpoint + "/" + job.id + "/history");
     id("role-history").replaceChildren(...(data.history.length ? data.history.map((event) => {
         const item = node("li");
         item.append(node("strong", stages.get(event.status)), node("span", event.actor + " · " + stamp(event.changed_at), "muted"));
+        if (event.note) item.append(node("p", event.note));
         return item;
     }) : [node("li", "No handoffs recorded yet.")]));
     id("role-issues").replaceChildren(...(data.incidents.length ? data.incidents.map((issue) => {
@@ -171,14 +183,18 @@ async function loadDetails() {
     }) : [node("li", "No issues reported.")]));
 }
 
-function openDetails(job) {
+function openDetails(job, focusHandoff = false) {
     selectedId = job.id;
     id("role-history").replaceChildren();
     id("role-issues").replaceChildren();
     id("role-issue-form").reset();
     if (lab) id("receipt-form").reset();
+    else id("handoff-form").reset();
     dialog.showModal();
-    perform(loadDetails, id("role-dialog-error"));
+    perform(async () => {
+        await loadDetails();
+        if (focusHandoff) id("handoff-form").elements.note.focus();
+    }, id("role-dialog-error"));
 }
 
 for (const stage of stageKeys) {
@@ -216,6 +232,21 @@ if (lab) {
             form.reset();
             await refresh();
             await loadDetails();
+        }, id("role-dialog-error"));
+    });
+} else {
+    const form = id("handoff-form");
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const job = jobs.find((item) => item.id === selectedId);
+        const status = job.status === "assigned" ? "picked_up" : "delivered";
+        perform(async () => {
+            await api(endpoint + "/" + job.id + "/status", "PATCH", {
+                status, note: form.elements.note.value, revision: job.revision,
+            });
+            form.reset();
+            await refresh();
+            dialog.close();
         }, id("role-dialog-error"));
     });
 }

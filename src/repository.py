@@ -33,6 +33,12 @@ class TransportRequestRepository:
                 ("sample_type", "TEXT NOT NULL DEFAULT 'unspecified'"),
                 ("receipt_condition", "TEXT"),
                 ("receipt_note", "TEXT"),
+                ("container_count", "INTEGER NOT NULL DEFAULT 1"),
+                ("pickup_at", "TEXT"),
+                ("pickup_contact", "TEXT NOT NULL DEFAULT ''"),
+                ("delivery_contact", "TEXT NOT NULL DEFAULT ''"),
+                ("instructions", "TEXT NOT NULL DEFAULT ''"),
+                ("revision", "INTEGER NOT NULL DEFAULT 0"),
             ):
                 if name not in existing_columns:
                     connection.execute(
@@ -49,6 +55,9 @@ class TransportRequestRepository:
                     changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            history_columns = {column[1] for column in connection.execute("PRAGMA table_info(transport_history)")}
+            if "note" not in history_columns:
+                connection.execute("ALTER TABLE transport_history ADD COLUMN note TEXT")
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS transport_incidents (
                     id INTEGER PRIMARY KEY,
@@ -76,10 +85,36 @@ class TransportRequestRepository:
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
             connection.execute("""
                 INSERT INTO transport_requests
-                    (id, sample_code, origin, destination, status, priority, due_at, created_at, sample_type)
+                    (id, sample_code, origin, destination, status, priority, due_at, created_at, sample_type,
+                     container_count, pickup_at, pickup_contact, delivery_contact, instructions)
                 VALUES
-                    (:id, :sample_code, :origin, :destination, :status, :priority, :due_at, :created_at, :sample_type)
+                    (:id, :sample_code, :origin, :destination, :status, :priority, :due_at, :created_at, :sample_type,
+                     :container_count, :pickup_at, :pickup_contact, :delivery_contact, :instructions)
             """, transport_request)
+
+    def update_plan(self, current, details, actor):
+        with closing(sqlite3.connect(self.database_path)) as connection, connection:
+            result = connection.execute("""
+                UPDATE transport_requests
+                SET sample_code = :sample_code, origin = :origin, destination = :destination,
+                    priority = :priority, sample_type = :sample_type, container_count = :container_count,
+                    pickup_at = :pickup_at, due_at = :due_at, pickup_contact = :pickup_contact,
+                    delivery_contact = :delivery_contact, instructions = :instructions, revision = revision + 1
+                WHERE id = :id AND revision = :revision AND status IN ('pending', 'assigned')
+            """, {**details, "id": current["id"], "revision": current["revision"]})
+            if result.rowcount != 1:
+                return False
+            self._record_history(
+                connection, current["id"], current["status"], current["status"], actor, "Request details updated",
+            )
+            return True
+
+    @staticmethod
+    def _record_history(connection, request_id, previous_status, status, actor, note):
+        connection.execute("""
+            INSERT INTO transport_history (request_id, previous_status, status, actor, note)
+            VALUES (?, ?, ?, ?, ?)
+        """, (request_id, previous_status, status, actor, note))
 
     def get(self, request_id):
         with closing(sqlite3.connect(self.database_path)) as connection:
@@ -107,26 +142,24 @@ class TransportRequestRepository:
         return [self._request_from_row(row) for row in rows]
 
     def change_status(
-        self, request_id, previous_status, status, actor, *,
-        courier_name=None, receipt_condition=None, receipt_note=None,
+        self, current, status, actor, *,
+        courier_name=None, receipt_condition=None, receipt_note=None, note=None,
     ):
+        request_id = current["id"]
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
             connection.row_factory = sqlite3.Row
             result = connection.execute("""
                 UPDATE transport_requests
                 SET status = ?, courier_name = COALESCE(?, courier_name),
                     receipt_condition = COALESCE(?, receipt_condition),
-                    receipt_note = COALESCE(?, receipt_note)
-                WHERE id = ? AND status = ?
-            """, (status, courier_name, receipt_condition, receipt_note, request_id, previous_status))
+                    receipt_note = COALESCE(?, receipt_note), revision = revision + 1
+                WHERE id = ? AND revision = ?
+            """, (status, courier_name, receipt_condition, receipt_note, request_id, current["revision"]))
 
             if result.rowcount != 1:
                 return None
 
-            connection.execute("""
-                INSERT INTO transport_history (request_id, previous_status, status, actor)
-                VALUES (?, ?, ?, ?)
-            """, (request_id, previous_status, status, actor))
+            self._record_history(connection, request_id, current["status"], status, actor, note)
             if receipt_condition == "issue":
                 connection.execute("""
                     INSERT INTO transport_incidents (request_id, description, reported_by)
@@ -143,7 +176,7 @@ class TransportRequestRepository:
         with closing(sqlite3.connect(self.database_path)) as connection:
             connection.row_factory = sqlite3.Row
             rows = connection.execute("""
-                SELECT previous_status, status, actor, changed_at
+                SELECT previous_status, status, actor, changed_at, note
                 FROM transport_history
                 WHERE request_id = ?
                 ORDER BY id

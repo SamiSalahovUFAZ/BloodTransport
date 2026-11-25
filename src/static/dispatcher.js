@@ -7,6 +7,7 @@ const statusLabels = {
     picked_up: "In transit",
     delivered: "Delivered",
     received: "Received",
+    cancelled: "Cancelled",
 };
 const priorityLabels = { critical: "Critical", urgent: "Urgent", standard: "Standard" };
 const sampleTypeLabels = JSON.parse(byId("sample-type-labels").textContent);
@@ -18,7 +19,8 @@ const detailsDialog = byId("details-dialog");
 let requests = [];
 let visibleRequests = [];
 let activeRequestId;
-let assignmentId;
+let assignment;
+let editing;
 let latestRefresh = 0;
 let latestDetails = 0;
 
@@ -43,7 +45,7 @@ function formatDate(value) {
 }
 
 function isOverdue(job) {
-    return job.status !== "received" && job.due_at && Date.parse(job.due_at) < Date.now();
+    return !["received", "cancelled"].includes(job.status) && job.due_at && Date.parse(job.due_at) < Date.now();
 }
 
 function showError(node, message = "") {
@@ -97,7 +99,10 @@ function rowFor(job) {
     if (isOverdue(job)) deadline.append(element("span", "Overdue", "issue-note"));
     const actions = element("td");
     const group = element("div", "", "row-actions");
-    if (job.status === "pending") group.append(button("Assign", () => openAssignment(job)));
+    if (["pending", "assigned"].includes(job.status)) {
+        group.append(button(job.status === "pending" ? "Assign" : "Reassign", () => openAssignment(job)));
+        group.append(button("Edit", () => openPlan(job)));
+    }
     const view = button("Details", () => openDetails(job));
     view.setAttribute("aria-label", "Details for " + job.sample_code);
     group.append(view);
@@ -185,11 +190,37 @@ function formHandler(form, submit) {
 }
 
 function openAssignment(job) {
-    assignmentId = job.id;
+    assignment = job;
     byId("assign-form").reset();
+    byId("assign-form").elements.courier_name.value = job.courier_name || "";
     showError(byId("assign-form").querySelector("[data-error]"));
     byId("assign-sample").textContent = "Sample " + job.sample_code;
     assignDialog.showModal();
+}
+
+function localDateTime(value) {
+    const date = new Date(value);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 16);
+}
+
+function openPlan(job = null) {
+    editing = job;
+    const form = byId("request-form");
+    form.reset();
+    showError(form.querySelector("[data-error]"));
+    byId("request-title").textContent = job ? "Edit transport request" : "New transport request";
+    form.querySelector('button[type="submit"]').textContent = job ? "Save changes" : "Create request";
+    if (job) {
+        for (const field of ["sample_code", "origin", "destination", "sample_type", "priority",
+            "container_count", "pickup_contact", "delivery_contact", "instructions"]) {
+            form.elements[field].value = job[field] ?? "";
+        }
+        for (const field of ["pickup_at", "due_at"]) {
+            if (job[field]) form.elements[field].value = localDateTime(job[field]);
+        }
+    }
+    requestDialog.showModal();
 }
 
 function openDetails(job) {
@@ -201,6 +232,19 @@ function openDetails(job) {
         if (job.receipt_note) byId("detail-route").textContent += " · " + job.receipt_note;
     }
     byId("incident-form").reset();
+    byId("cancel-form").reset();
+    byId("cancel-form").hidden = !["pending", "assigned"].includes(job.status);
+    const facts = [
+        ["Containers", String(job.container_count)],
+        ["Scheduled pickup", formatDate(job.pickup_at)],
+        ["Delivery deadline", formatDate(job.due_at)],
+        ["Pickup contact", job.pickup_contact],
+        ["Delivery contact", job.delivery_contact],
+        ["Handoff instructions", job.instructions],
+    ];
+    byId("detail-plan").replaceChildren(...facts.filter(([, value]) => value).flatMap(([label, value]) => [
+        element("dt", label), element("dd", value),
+    ]));
     byId("timeline").replaceChildren();
     byId("incidents").replaceChildren();
     detailsDialog.showModal();
@@ -248,7 +292,10 @@ async function refreshDetails(requestId) {
         const data = await api(endpoint + "/" + requestId + "/history");
         if (refresh !== latestDetails || !detailsDialog.open) return;
         const job = requests.find((request) => request.id === requestId);
-        const history = data.history.map((event) => historyItem(statusLabels[event.status] || event.status, event.actor, event.changed_at));
+        const history = data.history.map((event) => historyItem(
+            event.note ? (statusLabels[event.status] || event.status) + " · " + event.note : statusLabels[event.status] || event.status,
+            event.actor, event.changed_at,
+        ));
         if (job?.created_at) history.unshift(historyItem("Request created", null, job.created_at));
         byId("timeline").replaceChildren(...(history.length ? history : [element("li", "No status changes yet.")]));
         const issues = data.incidents.map((incident) => incidentItem(incident, requestId));
@@ -287,20 +334,28 @@ for (const dialog of [requestDialog, assignDialog, detailsDialog]) {
     });
 }
 detailsDialog.addEventListener("close", () => { latestDetails += 1; });
-byId("new-request").addEventListener("click", () => {
-    byId("request-form").reset();
-    showError(byId("request-form").querySelector("[data-error]"));
-    requestDialog.showModal();
-});
+byId("new-request").addEventListener("click", () => openPlan());
 formHandler(byId("request-form"), async (data) => {
     data.due_at = data.due_at ? new Date(data.due_at).toISOString() : null;
-    await api(endpoint, "POST", data);
+    data.pickup_at = data.pickup_at ? new Date(data.pickup_at).toISOString() : null;
+    data.container_count = Number(data.container_count);
+    if (editing) {
+        await api(endpoint + "/" + editing.id, "PATCH", {...data, revision: editing.revision});
+    } else {
+        await api(endpoint, "POST", data);
+    }
     requestDialog.close();
     await refreshQueue();
 });
 formHandler(byId("assign-form"), async (data) => {
-    await api(endpoint + "/" + assignmentId + "/assign", "POST", data);
+    await api(endpoint + "/" + assignment.id + "/assign", "POST", {...data, revision: assignment.revision});
     assignDialog.close();
+    await refreshQueue();
+});
+formHandler(byId("cancel-form"), async (data) => {
+    const job = requests.find((item) => item.id === activeRequestId);
+    await api(endpoint + "/" + job.id + "/cancel", "POST", {...data, revision: job.revision});
+    detailsDialog.close();
     await refreshQueue();
 });
 formHandler(byId("incident-form"), async (data) => {

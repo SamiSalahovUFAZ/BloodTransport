@@ -26,6 +26,7 @@
 <dialog id="role-dialog" class="detail-dialog" aria-labelledby="role-dialog-title">
     <div class="dialog-heading"><h2 id="role-dialog-title">Sample details</h2><button id="role-close" type="button" class="secondary">Close</button></div>
     <p id="role-dialog-description" class="muted"></p>
+    <dl id="role-plan" class="role-facts"></dl>
     <p id="role-dialog-error" class="error" role="alert" hidden></p>
     <div class="detail-grid">
         <section aria-labelledby="role-history-title"><h3 id="role-history-title">Handoff history</h3><ol id="role-history" class="timeline"></ol></section>
@@ -35,6 +36,12 @@
         <label>{{ "Report intake issue" if role_mode == "laboratory" else "Report delay or issue" }} <textarea name="description" rows="2" maxlength="500" required></textarea></label>
         <button type="submit">Report issue</button>
     </form>
+    {% if role_mode == "courier" %}
+    <form id="handoff-form" class="dialog-form receipt-panel" hidden>
+        <label>Handoff note <textarea name="note" rows="2" maxlength="500"></textarea></label>
+        <button type="submit" id="handoff-submit">Record handoff</button>
+    </form>
+    {% endif %}
     {% if role_mode == "laboratory" %}
     <form id="receipt-form" class="dialog-form receipt-panel" hidden>
         <h3>Record receipt</h3>

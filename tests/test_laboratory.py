@@ -70,3 +70,57 @@ def test_role_scoped_sample_receipt(tmp_path):
     ]
     assert details["incidents"][0]["description"] == "Label partly unreadable."
     assert dispatcher.get(base).json["requests"][0]["open_incidents"] == 1
+
+
+def test_transport_planning_changes_and_handoff(tmp_path):
+    database = tmp_path / "transports.sqlite3"
+    app = create_app(database)
+    accounts = AccountRepository(database)
+    headers = {"X-CSRF-Token": "test-token"}
+    base = "/api/transport-requests"
+
+    def sign_in(username, role):
+        accounts.create(username, "unused", role, None)
+        client = app.test_client()
+        with client.session_transaction() as session:
+            session.update(username=username, csrf_token="test-token")
+        return client
+
+    dispatcher = sign_in("Sam", "dispatcher")
+    first = sign_in("Alex", "courier")
+    second = sign_in("Lee", "courier")
+    plan = {
+        "sample_code": "RUN-001", "origin": "Clinic", "destination": "Lab",
+        "container_count": 3, "pickup_at": "2030-01-01T12:00:00+04:00",
+        "due_at": "2030-01-01T14:00:00+04:00", "pickup_contact": "East desk",
+        "delivery_contact": "Receiving", "instructions": "Meet at the east entrance.",
+    }
+    invalid = dispatcher.post(base, json={**plan, "due_at": "2030-01-01T07:00:00Z"}, headers=headers)
+    assert invalid.status_code == 400
+    job = dispatcher.post(base, json=plan, headers=headers).json
+    assert job["container_count"] == 3
+    assert job["pickup_at"] == "2030-01-01T08:00:00+00:00"
+    url = f"{base}/{job['id']}"
+
+    for name in ("Alex", "Lee"):
+        assert dispatcher.post(url + "/assign", json={"courier_name": name}, headers=headers).status_code == 200
+    assert first.get(url).status_code == 404
+    snapshot = second.get(url).json
+    revised = {**plan, "revision": snapshot["revision"], "instructions": "Use the side entrance."}
+    assert dispatcher.patch(url, json=revised, headers=headers).status_code == 200
+    assert dispatcher.patch(url, json=revised, headers=headers).status_code == 409
+    assert second.get(url).json["instructions"] == "Use the side entrance."
+
+    pickup = {"status": "picked_up", "note": "Collected at the side entrance."}
+    assert second.patch(url + "/status", json={**pickup, "revision": snapshot["revision"]}, headers=headers).status_code == 409
+    assert second.patch(url + "/status", json=pickup, headers=headers).status_code == 200
+    assert dispatcher.post(url + "/cancel", json={"reason": "Duplicate"}, headers=headers).status_code == 409
+    assert dispatcher.post(url + "/assign", json={"courier_name": "Alex"}, headers=headers).status_code == 409
+    assert second.get(url + "/history").json["history"][-1]["note"] == pickup["note"]
+
+    another = dispatcher.post(base, json={**plan, "sample_code": "RUN-002"}, headers=headers).json
+    another_url = f"{base}/{another['id']}"
+    assert dispatcher.post(another_url + "/cancel", json={"reason": " "}, headers=headers).status_code == 400
+    assert dispatcher.post(another_url + "/cancel", json={"reason": "Duplicate"}, headers=headers).json["status"] == "cancelled"
+    events = dispatcher.get(another_url + "/history").json["history"]
+    assert events[-1]["note"] == "Cancelled: Duplicate"
