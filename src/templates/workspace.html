@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block layout %}
+    <header class="workspace-header">
+        <div class="shell app-bar">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-mark" aria-hidden="true"></span>BloodTransport
+            </a>
+            <nav class="workspace-nav" aria-label="Workspace">
+                <a href="{{ url_for('index') }}" aria-current="page"><span class="workspace-dot" aria-hidden="true"></span>{{ role_labels[g.account.role] }} workspace</a>
+            </nav>
+            <form class="account-bar" action="{{ url_for('auth.logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <span class="account-avatar" aria-hidden="true">{{ g.account.username[:2] | upper }}</span>
+                <span class="account-name">{{ g.account.username }}</span>
+                <button type="submit" class="secondary">Sign out</button>
+            </form>
+        </div>
+    </header>
+    {% block content %}{% endblock %}
+{% endblock %}

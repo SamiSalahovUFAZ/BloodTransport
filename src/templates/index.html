@@ -1,273 +1,147 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BloodTransport</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #f4f6fa; color: #202b3c; font: 1rem/1.5 system-ui, sans-serif; }
-        header { background: #172842; color: white; padding: 1.5rem 0; border-bottom: 4px solid #dc6678; }
-        header nav, main { width: min(68rem, calc(100% - 2rem)); margin-inline: auto; }
-        header nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
-        header h1 { margin: 0; font-size: 1.65rem; }
-        header a { color: inherit; }
-        .dashboard-links { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
-        main { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.7fr); align-items: start; gap: 1.5rem; padding-block: 2rem; }
-        .panel, .card, dialog { border: 1px solid #dce3ec; border-radius: 1rem; background: white; padding: 1.25rem; }
-        h2 { margin: 0 0 1rem; font-size: 1.25rem; }
-        label { display: grid; gap: .35rem; margin-bottom: 1rem; font-weight: 600; }
-        input, button { border-radius: .55rem; font: inherit; padding: .65rem .8rem; }
-        input { min-width: 0; width: 100%; border: 1px solid #8997aa; }
-        button { border: 1px solid transparent; background: #243e70; color: white; font-weight: 600; cursor: pointer; }
-        button.secondary { background: white; color: #243e70; border-color: #ccd6e3; }
-        button:disabled { opacity: .55; cursor: wait; }
-        :focus-visible { outline: 3px solid #536ebd; outline-offset: 3px; }
-        .error { color: #9e2240; }
-        .muted { color: #546378; }
-        ul { display: grid; gap: .8rem; padding: 0; margin: 0; list-style: none; }
-        .card { overflow-wrap: anywhere; }
-        .card-title, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
-        .card-title { justify-content: space-between; }
-        .card h3 { margin: 0; font-size: 1rem; }
-        .card p { margin: .5rem 0; }
-        .status { padding: .2rem .65rem; border-radius: 999px; background: #edf0f5; font-size: .85rem; font-weight: 650; }
-        .status[data-status="pending"] { background: #fff0cb; color: #704900; }
-        .status[data-status="assigned"] { background: #e7eeff; color: #24457c; }
-        .status[data-status="picked_up"] { background: #efe8ff; color: #53337e; }
-        .status[data-status="delivered"], .status[data-status="received"] { background: #dcf4e7; color: #17543a; }
-        dialog { width: min(28rem, calc(100% - 2rem)); color: inherit; }
-        dialog::backdrop { background: #17284299; }
-        .actions { justify-content: flex-end; }
-        @media (max-width: 44rem) {
-            main { grid-template-columns: 1fr; gap: 1rem; padding-block: 1rem; }
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <nav aria-label="Dashboards">
-            <h1>BloodTransport</h1>
-            <div class="dashboard-links">
-                <a href="{{ url_for('courier_dashboard') }}">Courier dashboard</a>
-                <a href="{{ url_for('laboratory_dashboard') }}">Laboratory dashboard</a>
+{% extends "workspace.html" %}
+{% block title %}Dispatcher dashboard | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations">
+    <section class="operations-heading">
+        <div>
+            <p class="section-label">Operations</p>
+            <h1>Transport overview</h1>
+            <p>Plan pickups, monitor deadlines, and track sample handoffs.</p>
+        </div>
+        <button type="button" id="new-request" class="primary-action"><span aria-hidden="true">+</span> New request</button>
+    </section>
+
+    <section class="summary-grid" aria-label="Request summary">
+        <button type="button" class="summary-item stage-tile" data-queue-status="" aria-pressed="true"><span>All requests</span><strong id="total-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile" data-queue-status="picked_up" aria-pressed="false"><span>In transit</span><strong id="transit-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile attention" data-queue-status="overdue" aria-pressed="false"><span>Overdue</span><strong id="overdue-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile" data-queue-status="issues" aria-pressed="false"><span>Open issues</span><strong id="issues-count">—</strong></button>
+        <button type="button" class="summary-item stage-tile complete" data-queue-status="received" aria-pressed="false"><span>Received</span><strong id="received-count">—</strong></button>
+    </section>
+
+    <section class="queue" aria-labelledby="queue-heading">
+        <div class="queue-heading">
+            <div><h2 id="queue-heading">Transport requests</h2><p id="result-count" role="status">Loading requests…</p></div>
+            <div class="queue-actions">
+                <button id="refresh" type="button" class="secondary">Refresh</button>
+                <button id="export" type="button" class="secondary" disabled>Export CSV</button>
             </div>
-        </nav>
-    </header>
+        </div>
+        <div class="queue-filters">
+            <label class="queue-search">Search
+                <input id="search" type="search" placeholder="Sample code, location, or courier">
+            </label>
+            <label>Sample type
+                <select id="sample-type-filter"><option value="">All types</option>{% for key, label in sample_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+            </label>
+            <label>Status
+                <select id="status-filter">
+                    <option value="">All statuses</option>
+                    <option value="pending">Awaiting assignment</option>
+                    <option value="assigned">Courier assigned</option>
+                    <option value="picked_up">In transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="received">Received</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="issues">Has open issues</option>
+                </select>
+            </label>
+            <label>Priority
+                <select id="priority-filter">
+                    <option value="">All priorities</option>
+                    <option value="critical">Critical</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="standard">Standard</option>
+                </select>
+            </label>
+            <label>Sort by
+                <select id="sort">
+                    <option value="newest">Newest</option>
+                    <option value="deadline">Delivery deadline</option>
+                    <option value="priority">Priority</option>
+                </select>
+            </label>
+        </div>
+        <p id="queue-error" class="error queue-message" role="alert" hidden></p>
+        <p id="empty" class="queue-message muted" hidden></p>
+        <div class="queue-scroll" id="queue-table" hidden>
+            <table>
+                <caption class="visually-hidden">Transport request list</caption>
+                <thead><tr><th scope="col">Sample and route</th><th scope="col">Status</th><th scope="col">Courier</th><th scope="col">Priority</th><th scope="col">Deadline</th><th scope="col">Actions</th></tr></thead>
+                <tbody id="request-rows"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
 
-    <main>
-        <form id="request-form" class="panel">
-            <h2>New transport request</h2>
-            <label>Sample code <input name="sample_code" required></label>
-            <label>Pickup location <input name="origin" required></label>
-            <label>Delivery location <input name="destination" required></label>
-            <button type="submit" disabled>Create request</button>
-            <p id="create-error" class="error" role="alert" hidden></p>
-        </form>
+<dialog id="request-dialog" class="detail-dialog" aria-labelledby="request-title">
+    <div class="dialog-heading"><h2 id="request-title">New transport request</h2><button type="button" data-close class="secondary">Close</button></div>
+    <form id="request-form" class="dialog-form">
+        <label>Sample code <input name="sample_code" maxlength="100" required></label>
+        <label>Pickup location <input name="origin" maxlength="100" required></label>
+        <label>Delivery location <input name="destination" list="laboratories" maxlength="100" required></label>
+        <datalist id="laboratories">{% for laboratory in directory.laboratories %}<option value="{{ laboratory }}">{% endfor %}</datalist>
+        <label>Sample type
+            <select name="sample_type" required><option value="">Choose type</option>{% for key, label in sample_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+        </label>
+        <label>Priority
+            <select name="priority"><option value="standard">Standard</option><option value="urgent">Urgent</option><option value="critical">Critical</option></select>
+        </label>
+        <fieldset class="plan-fields"><legend>Pickup and delivery</legend>
+            <label>Container count <input name="container_count" type="number" min="1" max="999" value="1" required></label>
+            <label>Scheduled pickup <input name="pickup_at" type="datetime-local"></label>
+            <label>Delivery deadline <input name="due_at" type="datetime-local"></label>
+            <label>Pickup contact <input name="pickup_contact" maxlength="100" placeholder="Team or desk"></label>
+            <label>Delivery contact <input name="delivery_contact" maxlength="100" placeholder="Team or desk"></label>
+        </fieldset>
+        <label>Handoff instructions <textarea name="instructions" rows="2" maxlength="1000" placeholder="Entrance, meeting point or handoff instructions"></textarea></label>
+        <p class="error" data-error role="alert" hidden></p>
+        <button type="submit">Create request</button>
+    </form>
+</dialog>
 
-        <section class="panel" aria-labelledby="requests-heading">
-            <h2 id="requests-heading">Transport requests</h2>
-            <p id="loading" class="muted" role="status">Loading requests…</p>
-            <p id="list-error" class="error" role="alert" hidden></p>
-            <p id="empty" class="muted" hidden>No requests yet.</p>
-            <ul id="requests" aria-live="polite"></ul>
+<dialog id="assign-dialog" aria-labelledby="assign-heading">
+    <div class="dialog-heading"><h2 id="assign-heading">Assign courier</h2><button type="button" data-close class="secondary">Close</button></div>
+    <p id="assign-sample" class="muted"></p>
+    <form id="assign-form" class="dialog-form">
+        <label>Courier
+            <select name="courier_name" required><option value="">Choose a registered courier</option>{% for courier in directory.couriers %}<option value="{{ courier }}">{{ courier }}</option>{% endfor %}</select>
+        </label>
+        {% if not directory.couriers %}<p class="muted">A courier must register before they can be assigned.</p>{% endif %}
+        <p class="error" data-error role="alert" hidden></p>
+        <button type="submit">Save assignment</button>
+    </form>
+</dialog>
+
+<dialog id="details-dialog" class="detail-dialog" aria-labelledby="detail-heading">
+    <div class="dialog-heading"><h2 id="detail-heading">Request details</h2><button type="button" data-close class="secondary">Close</button></div>
+    <p id="detail-route" class="muted"></p>
+    <dl id="detail-plan" class="role-facts"></dl>
+    <form id="cancel-form" class="dialog-form receipt-panel" hidden>
+        <label>Cancellation reason <input name="reason" maxlength="500" required></label>
+        <button type="submit" class="secondary">Cancel transport</button>
+    </form>
+    <p id="detail-feedback" role="status"></p>
+    <p id="detail-error" class="error" role="alert" hidden></p>
+    <div class="detail-grid">
+        <section aria-labelledby="timeline-heading">
+            <h3 id="timeline-heading">Status history</h3>
+            <ol id="timeline" class="timeline"></ol>
         </section>
-    </main>
+        <section aria-labelledby="incident-heading">
+            <h3 id="incident-heading">Issues</h3>
+            <ul id="incidents" class="incidents"></ul>
+            <form id="incident-form" class="dialog-form">
+                <label>Describe an issue <textarea name="description" maxlength="500" rows="3" required></textarea></label>
+                <button type="submit">Report issue</button>
+            </form>
+        </section>
+    </div>
+</dialog>
 
-    <dialog id="assign-dialog" aria-labelledby="assign-heading">
-        <form id="assign-form">
-            <h2 id="assign-heading">Assign courier</h2>
-            <p id="assign-sample" class="muted"></p>
-            <label>Courier name <input name="courier_name" required></label>
-            <label>Assigned by <input name="actor" required></label>
-            <p id="assign-error" class="error" role="alert" hidden></p>
-            <div class="actions">
-                <button id="cancel-assign" type="button" class="secondary">Cancel</button>
-                <button type="submit">Save assignment</button>
-            </div>
-        </form>
-    </dialog>
-
-    <script>
-        const requestsUrl = "/api/transport-requests";
-        const requestForm = document.querySelector("#request-form");
-        const createButton = requestForm.querySelector('button[type="submit"]');
-        const createError = document.querySelector("#create-error");
-        const requestsList = document.querySelector("#requests");
-        const loading = document.querySelector("#loading");
-        const empty = document.querySelector("#empty");
-        const listError = document.querySelector("#list-error");
-        const assignDialog = document.querySelector("#assign-dialog");
-        const assignForm = document.querySelector("#assign-form");
-        const assignButton = assignForm.querySelector('button[type="submit"]');
-        const cancelAssign = document.querySelector("#cancel-assign");
-        const assignSample = document.querySelector("#assign-sample");
-        const assignError = document.querySelector("#assign-error");
-        let selectedRequestId;
-        let latestLoad = 0;
-
-        const statusLabels = new Map([
-            ["pending", "New"],
-            ["assigned", "Courier assigned"],
-            ["picked_up", "Picked up"],
-            ["delivered", "Delivered"],
-            ["received", "Received"],
-        ]);
-
-        function showError(element, message) {
-            element.textContent = message;
-            element.hidden = false;
-        }
-
-        function cardFor(request) {
-            const card = document.createElement("li");
-            card.className = "card";
-
-            const heading = document.createElement("div");
-            heading.className = "card-title";
-            const title = document.createElement("h3");
-            title.textContent = "Sample " + request.sample_code;
-            const status = document.createElement("span");
-            status.className = "status";
-            status.dataset.status = request.status;
-            status.textContent = statusLabels.get(request.status) ?? "Unknown status";
-            heading.append(title, status);
-
-            const route = document.createElement("p");
-            route.textContent = request.origin + " → " + request.destination;
-            card.append(heading, route);
-
-            if (request.courier_name) {
-                const courier = document.createElement("p");
-                courier.textContent = "Courier: " + request.courier_name;
-                card.append(courier);
-            }
-
-            if (request.status === "pending") {
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "secondary";
-                button.textContent = "Assign courier";
-                button.addEventListener("click", () => {
-                    selectedRequestId = request.id;
-                    assignForm.reset();
-                    assignError.hidden = true;
-                    assignSample.textContent = "Sample " + request.sample_code;
-                    assignDialog.showModal();
-                });
-                card.append(button);
-            }
-
-            return card;
-        }
-
-        async function loadRequests() {
-            const load = ++latestLoad;
-            loading.hidden = false;
-            listError.hidden = true;
-            empty.hidden = true;
-
-            try {
-                const response = await fetch(requestsUrl, { cache: "no-store" });
-                if (!response.ok) throw new Error("Could not load requests.");
-
-                const { requests } = await response.json();
-                if (load !== latestLoad) return;
-
-                const cards = document.createDocumentFragment();
-                requests.forEach((request) => cards.append(cardFor(request)));
-                requestsList.replaceChildren(cards);
-                empty.hidden = requests.length > 0;
-            } catch {
-                if (load === latestLoad) {
-                    showError(listError, "Could not load requests. Refresh the page to try again.");
-                }
-            } finally {
-                if (load === latestLoad) loading.hidden = true;
-            }
-        }
-
-        function postForm(url, form) {
-            return fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(Object.fromEntries(new FormData(form))),
-            });
-        }
-
-        requestForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            createButton.disabled = true;
-            createError.hidden = true;
-
-            try {
-                const response = await postForm(requestsUrl, requestForm);
-                if (!response.ok) {
-                    const result = await response.json().catch(() => ({}));
-                    let message = "Could not create the request.";
-                    if (result.error === "Origin and destination must differ.") {
-                        message = "Pickup and delivery locations must be different.";
-                    } else if (response.status === 400) {
-                        message = "Fill in all fields and try again.";
-                    }
-                    showError(createError, message);
-                    return;
-                }
-
-                requestForm.reset();
-                await loadRequests();
-            } catch {
-                showError(createError, "Could not reach the server.");
-            } finally {
-                createButton.disabled = false;
-            }
-        });
-
-        cancelAssign.addEventListener("click", () => assignDialog.close());
-        assignDialog.addEventListener("cancel", (event) => {
-            if (assignButton.disabled) event.preventDefault();
-        });
-
-        assignForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            assignError.hidden = true;
-            const courierName = assignForm.elements.namedItem("courier_name").value.trim();
-            const actor = assignForm.elements.namedItem("actor").value.trim();
-            if (!courierName || !actor) {
-                showError(assignError, "Fill in both fields.");
-                return;
-            }
-
-            assignButton.disabled = true;
-            cancelAssign.disabled = true;
-
-            try {
-                const url = requestsUrl + "/" + encodeURIComponent(selectedRequestId) + "/assign";
-                const response = await postForm(url, assignForm);
-                if (response.status === 404 || response.status === 409) {
-                    await loadRequests();
-                    showError(assignError, "This request has changed. Close this window and check the list.");
-                    return;
-                }
-
-                if (!response.ok) {
-                    showError(assignError, "Could not assign the courier.");
-                    return;
-                }
-
-                await loadRequests();
-                assignDialog.close();
-            } catch {
-                showError(assignError, "Could not reach the server.");
-            } finally {
-                assignButton.disabled = false;
-                cancelAssign.disabled = false;
-            }
-        });
-
-        loadRequests().finally(() => {
-            createButton.disabled = false;
-        });
-    </script>
-</body>
-</html>
+{% endblock %}
+{% block scripts %}
+<script id="sample-type-labels" type="application/json">{{ sample_types | tojson }}</script>
+<script src="{{ url_for('static', filename='dispatcher.js') }}" defer></script>
+{% endblock %}
