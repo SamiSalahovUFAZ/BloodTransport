@@ -132,6 +132,10 @@ def create_app(database_path=None):
     def courier_dashboard():
         return render_template("courier.html")
 
+    @app.get("/laboratory")
+    def laboratory_dashboard():
+        return render_template("laboratory.html")
+
     return app
 
 

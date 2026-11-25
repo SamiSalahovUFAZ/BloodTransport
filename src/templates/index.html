@@ -12,6 +12,7 @@
         header nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
         header h1 { margin: 0; font-size: 1.65rem; }
         header a { color: inherit; }
+        .dashboard-links { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
         main { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.7fr); align-items: start; gap: 1.5rem; padding-block: 2rem; }
         .panel, .card, dialog { border: 1px solid #dce3ec; border-radius: 1rem; background: white; padding: 1.25rem; }
         h2 { margin: 0 0 1rem; font-size: 1.25rem; }
@@ -47,7 +48,10 @@
     <header>
         <nav aria-label="Dashboards">
             <h1>BloodTransport</h1>
-            <a href="{{ url_for('courier_dashboard') }}">Courier dashboard</a>
+            <div class="dashboard-links">
+                <a href="{{ url_for('courier_dashboard') }}">Courier dashboard</a>
+                <a href="{{ url_for('laboratory_dashboard') }}">Laboratory dashboard</a>
+            </div>
         </nav>
     </header>
 

@@ -1,0 +1,31 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f6fa; color: #202b3c; font: 1rem/1.5 system-ui, sans-serif; }
+.shell { width: min(64rem, calc(100% - 2rem)); margin-inline: auto; }
+header { background: #172842; color: #fff; border-bottom: 4px solid #dc6678; }
+header .shell { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; padding-block: 1rem; }
+header a { color: inherit; }
+main { padding-block: 2rem; }
+h1 { margin: 0 0 1rem; font-size: clamp(1.8rem, 4vw, 2.5rem); }
+h2 { margin: 0 0 .75rem; font-size: 1.25rem; }
+form, article { background: #fff; border: 1px solid #dce3ec; border-radius: .9rem; padding: 1.25rem; }
+form { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; margin-bottom: 1.5rem; }
+label { display: grid; gap: .3rem; flex: 1 1 12rem; max-width: 25rem; font-weight: 600; }
+input, button { min-height: 2.75rem; padding: .55rem .85rem; border-radius: .5rem; font: inherit; }
+input { min-width: 0; border: 1px solid #8795a8; }
+button { border: 0; background: #243e70; color: #fff; font-weight: 650; cursor: pointer; }
+button:disabled { opacity: .55; cursor: wait; }
+:focus-visible { outline: 3px solid #6758ae; outline-offset: 3px; }
+#jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: .85rem; }
+article { overflow-wrap: anywhere; }
+article h3 { margin: 0 0 .4rem; }
+article p { margin: .55rem 0; }
+.status { display: inline-block; padding: .18rem .6rem; border-radius: 999px; background: #e8effb; color: #263f6c; font-weight: 650; }
+.status[data-status="picked_up"] { background: #f0e9fa; color: #523179; }
+.status[data-status="delivered"], .status[data-status="received"] { background: #e0f4e9; color: #205539; }
+#error { color: #99263c; }
+
+.dashboard-links { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
+.status[data-status="awaiting"] { background: #fff0cb; color: #704900; }
+.receipt-form { display: grid; border: 0; padding: 0; margin: .9rem 0 0; }
+.receipt-form label { max-width: none; }
+.receipt-form button { justify-self: start; }
