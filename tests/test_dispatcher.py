@@ -2,6 +2,7 @@ import sqlite3
 from contextlib import closing
 
 from src.app import create_app
+from src.accounts import AccountRepository
 
 
 def test_dispatcher_planning_and_issue_tracking(tmp_path):
@@ -16,6 +17,7 @@ def test_dispatcher_planning_and_issue_tracking(tmp_path):
         """)
 
     client = create_app(database).test_client()
+    AccountRepository(database).create("Dispatcher", "unused", "dispatcher", None)
     with client.session_transaction() as session:
         session.update(username="Dispatcher", csrf_token="test-token")
     headers = {"X-CSRF-Token": "test-token"}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ "Create account" if registering else "Sign in" }} | BloodTransport{% endblock %}
+{% block title %}{{ "Choose a role" if setting_up else ("Create account" if registering else "Sign in") }} | BloodTransport{% endblock %}
 {% block layout %}
 <main class="auth-layout">
     <section class="auth-intro" aria-labelledby="brand-heading">
@@ -16,10 +16,24 @@
     </section>
     <section class="auth-panel" aria-labelledby="auth-heading">
         <div class="auth-card">
-            <h2 id="auth-heading">{{ "Create your account" if registering else "Sign in" }}</h2>
+            <h2 id="auth-heading">{{ "Choose your workspace" if setting_up else ("Create your account" if registering else "Sign in") }}</h2>
             {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-            <form class="auth-form" method="post" action="{{ url_for('auth.register' if registering else 'auth.login') }}">
+            <form class="auth-form" method="post" action="{{ url_for('auth.setup_role' if setting_up else ('auth.register' if registering else 'auth.login')) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if registering or setting_up %}
+                    <label>Workspace role
+                        <select name="role" id="workspace-role" required>
+                            <option value="">Choose a role</option>
+                            {% for value, label in role_labels.items() %}
+                                <option value="{{ value }}"{% if role == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label id="facility-field">Laboratory location
+                        <input name="facility" value="{{ facility or '' }}" maxlength="100" placeholder="e.g. Central Lab">
+                    </label>
+                {% endif %}
+                {% if not setting_up %}
                 <label>Username
                     <input name="username" value="{{ username | default('') }}" autocomplete="username" maxlength="32" required>
                 </label>
@@ -32,8 +46,10 @@
                         <input name="confirm_password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
                     </label>
                 {% endif %}
-                <button type="submit">{{ "Create account" if registering else "Sign in" }}</button>
+                {% endif %}
+                <button type="submit">{{ "Save workspace" if setting_up else ("Create account" if registering else "Sign in") }}</button>
             </form>
+            {% if not setting_up %}
             <p class="account-switch">
                 {% if registering %}
                     Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a>
@@ -41,7 +57,25 @@
                     New to BloodTransport? <a href="{{ url_for('auth.register') }}">Create an account</a>
                 {% endif %}
             </p>
+            {% endif %}
         </div>
     </section>
 </main>
+{% endblock %}
+{% block scripts %}
+{% if registering or setting_up %}
+<script>
+    const workspaceRole = document.querySelector("#workspace-role");
+    const facilityField = document.querySelector("#facility-field");
+    const facility = facilityField.querySelector("input");
+    function syncFacility() {
+        const laboratory = workspaceRole.value === "laboratory";
+        facilityField.hidden = !laboratory;
+        facility.disabled = !laboratory;
+        facility.required = laboratory;
+    }
+    workspaceRole.addEventListener("change", syncFacility);
+    syncFacility();
+</script>
+{% endif %}
 {% endblock %}

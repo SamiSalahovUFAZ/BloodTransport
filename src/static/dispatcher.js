@@ -9,6 +9,7 @@ const statusLabels = {
     received: "Received",
 };
 const priorityLabels = { critical: "Critical", urgent: "Urgent", standard: "Standard" };
+const sampleTypeLabels = JSON.parse(byId("sample-type-labels").textContent);
 const priorityRank = { critical: 0, urgent: 1, standard: 2 };
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 const requestDialog = byId("request-dialog");
@@ -80,6 +81,7 @@ function rowFor(job) {
     const sample = element("th");
     sample.scope = "row";
     sample.append(element("strong", job.sample_code), element("span", job.origin + " → " + job.destination, "route"));
+    sample.append(element("span", sampleTypeLabels[job.sample_type] || "Unspecified", "route"));
     if (job.open_incidents) {
         sample.append(element("span", job.open_incidents + (job.open_incidents === 1 ? " open issue" : " open issues"), "issue-note"));
     }
@@ -112,11 +114,13 @@ function filterRequests() {
     const query = byId("search").value.trim().toLowerCase();
     const status = byId("status-filter").value;
     const priority = byId("priority-filter").value;
+    const sampleType = byId("sample-type-filter").value;
     const order = byId("sort").value;
     const matches = requests.filter((job) => {
         const fields = [job.sample_code, job.origin, job.destination, job.courier_name];
         if (query && !fields.some((field) => field && field.toLowerCase().includes(query))) return false;
         if (priority && (job.priority || "standard") !== priority) return false;
+        if (sampleType && job.sample_type !== sampleType) return false;
         if (status === "overdue") return isOverdue(job);
         if (status === "issues") return job.open_incidents > 0;
         return !status || job.status === status;
@@ -192,6 +196,10 @@ function openDetails(job) {
     activeRequestId = job.id;
     byId("detail-heading").textContent = "Sample " + job.sample_code;
     byId("detail-route").textContent = job.origin + " → " + job.destination;
+    if (job.receipt_condition) {
+        byId("detail-route").textContent += " · " + (job.receipt_condition === "issue" ? "Received with issue" : "Receipt accepted");
+        if (job.receipt_note) byId("detail-route").textContent += " · " + job.receipt_note;
+    }
     byId("incident-form").reset();
     byId("timeline").replaceChildren();
     byId("incidents").replaceChildren();
@@ -259,9 +267,9 @@ function csvCell(value) {
 }
 
 function downloadCsv() {
-    const lines = [["Sample code", "Pickup", "Destination", "Status", "Courier", "Priority", "Deadline (UTC)", "Open issues"]];
+    const lines = [["Sample code", "Sample type", "Pickup", "Destination", "Status", "Courier", "Priority", "Deadline (UTC)", "Open issues"]];
     for (const job of visibleRequests) {
-        lines.push([job.sample_code, job.origin, job.destination, statusLabels[job.status], job.courier_name, job.priority, job.due_at, job.open_incidents]);
+        lines.push([job.sample_code, sampleTypeLabels[job.sample_type], job.origin, job.destination, statusLabels[job.status], job.courier_name, job.priority, job.due_at, job.open_incidents]);
     }
     const file = new Blob([lines.map((line) => line.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(file);
@@ -302,7 +310,7 @@ formHandler(byId("incident-form"), async (data) => {
     await Promise.all([refreshQueue(), refreshDetails(requestId)]);
 });
 byId("search").addEventListener("input", renderQueue);
-for (const id of ["status-filter", "priority-filter", "sort"]) byId(id).addEventListener("change", renderQueue);
+for (const id of ["sample-type-filter", "status-filter", "priority-filter", "sort"]) byId(id).addEventListener("change", renderQueue);
 byId("refresh").addEventListener("click", refreshQueue);
 byId("export").addEventListener("click", downloadCsv);
 refreshQueue();

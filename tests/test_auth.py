@@ -21,6 +21,7 @@ def test_account_registration_login_and_logout_without_scrypt(tmp_path, monkeypa
     password = "test-password-42"
     registration = {
         "username": "Team.Member",
+        "role": "dispatcher",
         "password": password,
         "confirm_password": password,
     }
@@ -52,3 +53,23 @@ def test_account_registration_login_and_logout_without_scrypt(tmp_path, monkeypa
     registration["username"] = "team.member"
     registration["csrf_token"] = get_token(another_client, "/register")
     assert another_client.post("/register", data=registration).status_code == 400
+
+
+def test_existing_account_can_choose_a_role_once(tmp_path):
+    database = tmp_path / "legacy.sqlite3"
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute("CREATE TABLE accounts (username TEXT COLLATE NOCASE PRIMARY KEY, password_hash TEXT)")
+        connection.execute("INSERT INTO accounts VALUES ('Legacy', 'unused')")
+    client = create_app(database).test_client()
+    with client.session_transaction() as session:
+        session["username"] = "Legacy"
+    assert client.get("/").location == "/choose-role"
+    assert client.get("/api/transport-requests").status_code == 403
+    token = get_token(client, "/choose-role")
+    assert client.post("/choose-role", data={"role": "laboratory", "csrf_token": token}).status_code == 400
+    assert client.post("/choose-role", data={
+        "role": "laboratory", "facility": "Central Lab", "csrf_token": token,
+    }).location == "/"
+    assert client.get("/").location == "/laboratory"
+    client.post("/choose-role", data={"role": "dispatcher", "csrf_token": token})
+    assert client.get("/").location == "/laboratory"

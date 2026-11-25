@@ -30,6 +30,9 @@ class TransportRequestRepository:
                 ("priority", "TEXT NOT NULL DEFAULT 'standard'"),
                 ("due_at", "TEXT"),
                 ("created_at", "TEXT"),
+                ("sample_type", "TEXT NOT NULL DEFAULT 'unspecified'"),
+                ("receipt_condition", "TEXT"),
+                ("receipt_note", "TEXT"),
             ):
                 if name not in existing_columns:
                     connection.execute(
@@ -73,9 +76,9 @@ class TransportRequestRepository:
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
             connection.execute("""
                 INSERT INTO transport_requests
-                    (id, sample_code, origin, destination, status, priority, due_at, created_at)
+                    (id, sample_code, origin, destination, status, priority, due_at, created_at, sample_type)
                 VALUES
-                    (:id, :sample_code, :origin, :destination, :status, :priority, :due_at, :created_at)
+                    (:id, :sample_code, :origin, :destination, :status, :priority, :due_at, :created_at, :sample_type)
             """, transport_request)
 
     def get(self, request_id):
@@ -103,14 +106,19 @@ class TransportRequestRepository:
 
         return [self._request_from_row(row) for row in rows]
 
-    def change_status(self, request_id, previous_status, status, actor, *, courier_name=None):
+    def change_status(
+        self, request_id, previous_status, status, actor, *,
+        courier_name=None, receipt_condition=None, receipt_note=None,
+    ):
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
             connection.row_factory = sqlite3.Row
             result = connection.execute("""
                 UPDATE transport_requests
-                SET status = ?, courier_name = COALESCE(?, courier_name)
+                SET status = ?, courier_name = COALESCE(?, courier_name),
+                    receipt_condition = COALESCE(?, receipt_condition),
+                    receipt_note = COALESCE(?, receipt_note)
                 WHERE id = ? AND status = ?
-            """, (status, courier_name, request_id, previous_status))
+            """, (status, courier_name, receipt_condition, receipt_note, request_id, previous_status))
 
             if result.rowcount != 1:
                 return None
@@ -119,6 +127,11 @@ class TransportRequestRepository:
                 INSERT INTO transport_history (request_id, previous_status, status, actor)
                 VALUES (?, ?, ?, ?)
             """, (request_id, previous_status, status, actor))
+            if receipt_condition == "issue":
+                connection.execute("""
+                    INSERT INTO transport_incidents (request_id, description, reported_by)
+                    VALUES (?, ?, ?)
+                """, (request_id, receipt_note, actor))
 
             row = connection.execute(
                 "SELECT * FROM transport_requests WHERE id = ?", (request_id,)

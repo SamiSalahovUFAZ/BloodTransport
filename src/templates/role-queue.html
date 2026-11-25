@@ -1,0 +1,51 @@
+{% extends "workspace.html" %}
+{% block title %}{{ heading }} | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations" id="role-board" data-mode="{{ role_mode }}">
+    <section class="operations-heading">
+        <div><h1>{{ heading }}</h1><p>{{ description }}</p></div>
+        <button id="role-refresh" type="button" class="secondary">Refresh</button>
+    </section>
+    <section id="stage-summary" class="summary-grid role-summary" aria-label="Queue by stage"></section>
+    <section class="queue" aria-labelledby="role-queue-heading">
+        <div class="queue-heading"><div><h2 id="role-queue-heading">{{ "Sample queue" if role_mode == "laboratory" else "My assignments" }}</h2><p id="role-feedback" role="status">Loading…</p></div></div>
+        <div class="queue-filters role-filters">
+            <label>Search <input id="role-search" type="search" placeholder="Sample code or location"></label>
+            <label>Sample type <select id="role-type"><option value="">All types</option>{% for value, label in sample_types.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+            <label>Stage <select id="role-stage"><option value="">All stages</option></select></label>
+            {% if role_mode == "laboratory" %}
+            <label>Receipt outcome <select id="role-condition"><option value="">Any outcome</option><option value="accepted">Accepted</option><option value="issue">Received with issue</option></select></label>
+            {% else %}
+            <label>Priority <select id="role-priority"><option value="">All priorities</option><option value="critical">Critical</option><option value="urgent">Urgent</option><option value="standard">Standard</option></select></label>
+            {% endif %}
+        </div>
+        <p id="role-error" class="error queue-message" role="alert" hidden></p>
+        <div id="role-cards" class="role-cards"></div>
+    </section>
+</main>
+<dialog id="role-dialog" class="detail-dialog" aria-labelledby="role-dialog-title">
+    <div class="dialog-heading"><h2 id="role-dialog-title">Sample details</h2><button id="role-close" type="button" class="secondary">Close</button></div>
+    <p id="role-dialog-description" class="muted"></p>
+    <p id="role-dialog-error" class="error" role="alert" hidden></p>
+    <div class="detail-grid">
+        <section aria-labelledby="role-history-title"><h3 id="role-history-title">Handoff history</h3><ol id="role-history" class="timeline"></ol></section>
+        <section aria-labelledby="role-issues-title"><h3 id="role-issues-title">Reported issues</h3><ul id="role-issues" class="incidents"></ul></section>
+    </div>
+    <form id="role-issue-form" class="dialog-form">
+        <label>{{ "Report intake issue" if role_mode == "laboratory" else "Report delay or issue" }} <textarea name="description" rows="2" maxlength="500" required></textarea></label>
+        <button type="submit">Report issue</button>
+    </form>
+    {% if role_mode == "laboratory" %}
+    <form id="receipt-form" class="dialog-form receipt-panel" hidden>
+        <h3>Record receipt</h3>
+        <label>Receipt outcome <select name="condition"><option value="accepted">Accepted</option><option value="issue">Received with issue</option></select></label>
+        <label>Receipt note <textarea name="note" rows="2" maxlength="500" placeholder="Required when reporting an issue"></textarea></label>
+        <button type="submit">Confirm receipt</button>
+    </form>
+    {% endif %}
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script id="role-sample-types" type="application/json">{{ sample_types | tojson }}</script>
+<script src="{{ url_for('static', filename='role-queue.js') }}" defer></script>
+{% endblock %}

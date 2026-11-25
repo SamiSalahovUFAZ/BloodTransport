@@ -31,6 +31,9 @@
             <label class="queue-search">Search
                 <input id="search" type="search" placeholder="Sample code, location, or courier">
             </label>
+            <label>Sample type
+                <select id="sample-type-filter"><option value="">All types</option>{% for key, label in sample_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+            </label>
             <label>Status
                 <select id="status-filter">
                     <option value="">All statuses</option>
@@ -76,7 +79,11 @@
     <form id="request-form" class="dialog-form">
         <label>Sample code <input name="sample_code" maxlength="100" required></label>
         <label>Pickup location <input name="origin" maxlength="100" required></label>
-        <label>Delivery location <input name="destination" maxlength="100" required></label>
+        <label>Delivery location <input name="destination" list="laboratories" maxlength="100" required></label>
+        <datalist id="laboratories">{% for laboratory in directory.laboratories %}<option value="{{ laboratory }}">{% endfor %}</datalist>
+        <label>Sample type
+            <select name="sample_type" required><option value="">Choose type</option>{% for key, label in sample_types.items() if key != 'unspecified' %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+        </label>
         <label>Priority
             <select name="priority"><option value="standard">Standard</option><option value="urgent">Urgent</option><option value="critical">Critical</option></select>
         </label>
@@ -90,7 +97,10 @@
     <div class="dialog-heading"><h2 id="assign-heading">Assign courier</h2><button type="button" data-close class="secondary">Close</button></div>
     <p id="assign-sample" class="muted"></p>
     <form id="assign-form" class="dialog-form">
-        <label>Courier name <input name="courier_name" required></label>
+        <label>Courier
+            <select name="courier_name" required><option value="">Choose a registered courier</option>{% for courier in directory.couriers %}<option value="{{ courier }}">{{ courier }}</option>{% endfor %}</select>
+        </label>
+        {% if not directory.couriers %}<p class="muted">A courier must register before they can be assigned.</p>{% endif %}
         <p class="error" data-error role="alert" hidden></p>
         <button type="submit">Save assignment</button>
     </form>
@@ -119,5 +129,6 @@
 
 {% endblock %}
 {% block scripts %}
+<script id="sample-type-labels" type="application/json">{{ sample_types | tojson }}</script>
 <script src="{{ url_for('static', filename='dispatcher.js') }}" defer></script>
 {% endblock %}

@@ -14,13 +14,14 @@ Open [http://127.0.0.1:5001/](http://127.0.0.1:5001/) and choose **Create an acc
 
 ## Demo
 
-1. In **Dispatcher**, create a sample request to `Central Lab` and assign a courier named `Alex`.
-2. In **Courier**, filter by `Alex` and mark the sample as picked up, then delivered.
-3. In **Laboratory**, filter by `Central Lab` and confirm receipt. The signed-in username is recorded with every status change.
+1. Register three demo accounts with the **Dispatcher**, **Courier**, and **Laboratory** roles. Use `Alex` for the courier username and `Central Lab` for the laboratory location.
+2. Sign in as the dispatcher, create a typed sample request to `Central Lab`, and assign `Alex`.
+3. Sign in as Alex to see the assigned run, record pickup and delivery, and report any delays.
+4. Sign in with the laboratory account to filter the sample queue by type or stage and record the intake outcome. Choosing **Received with issue** requires a note and opens an issue for the dispatcher.
 
 The dispatcher dashboard includes a summary of transport activity, search and filters, optional delivery deadlines, and CSV export of the current view. Open a request's details to see status changes, report an issue, or resolve a reported issue.
 
-All signed-in users share the demo workspace. Courier and laboratory filters help users find assignments. The application does not implement per-role access control.
+Each signed-in account opens its own workspace. The API enforces the role and limits courier and laboratory records to their assignments and registered destinations. Existing accounts choose their role once at sign-in. Registration is self-service for the classroom demo, so role and laboratory ownership are not verified.
 
 ## Tests
 
