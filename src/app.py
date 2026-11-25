@@ -59,6 +59,9 @@ def create_app(database_path=None):
         if next_status.get(current["status"]) != status:
             return jsonify(error="Invalid status transition."), 409
 
+        if status == "assigned" and not courier_name:
+            return jsonify(error="Use the assign endpoint to assign a courier."), 400
+
         updated = repository.change_status(
             request_id,
             current["status"],
