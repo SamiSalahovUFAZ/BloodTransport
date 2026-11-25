@@ -1,23 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Laboratory dashboard | BloodTransport</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
-</head>
-<body>
-    <header>
-        <nav class="shell" aria-label="Dashboards">
-            <strong>BloodTransport</strong>
-            <div class="dashboard-links">
-                <a href="{{ url_for('index') }}">Dispatcher dashboard</a>
-                <a href="{{ url_for('courier_dashboard') }}">Courier dashboard</a>
-            </div>
-        </nav>
-    </header>
+{% extends "workspace.html" %}
+{% block title %}Laboratory dashboard | BloodTransport{% endblock %}
+{% block content %}
     <main class="shell">
-        <h1>Laboratory dashboard</h1>
+        <section class="page-heading">
+            <h1>Laboratory dashboard</h1>
+            <p>Find incoming samples and confirm receipt.</p>
+        </section>
         <form id="destination-filter">
             <label for="destination">Laboratory location
                 <input id="destination" placeholder="Delivery location entered by the dispatcher" required>
@@ -34,14 +22,13 @@
 
     <template id="receipt-template">
         <form class="receipt-form">
-            <label>Received by
-                <input name="actor" placeholder="Your name" required>
-            </label>
             <button type="submit">Confirm receipt</button>
         </form>
     </template>
-
+{% endblock %}
+{% block scripts %}
     <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
         const form = document.querySelector("#destination-filter");
         const destination = document.querySelector("#destination");
         const jobs = document.querySelector("#jobs");
@@ -90,17 +77,9 @@
 
             if (job.status === "delivered") {
                 const receiptForm = receiptTemplate.content.firstElementChild.cloneNode(true);
-                const receiver = receiptForm.elements.namedItem("actor");
-                receiver.addEventListener("input", () => receiver.setCustomValidity(""));
                 receiptForm.addEventListener("submit", (event) => {
                     event.preventDefault();
-                    const actor = receiver.value.trim();
-                    if (!actor) {
-                        receiver.setCustomValidity("Enter the recipient's name.");
-                        receiver.reportValidity();
-                        return;
-                    }
-                    confirmReceipt(job, actor);
+                    confirmReceipt(job);
                 });
                 card.append(receiptForm);
             }
@@ -123,14 +102,14 @@
                 : "No samples found for " + location + ".";
         }
 
-        async function confirmReceipt(job, actor) {
+        async function confirmReceipt(job) {
             error.hidden = true;
             setBusy(true);
             try {
                 const response = await fetch(endpoint + "/" + encodeURIComponent(job.id) + "/status", {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: "received", actor }),
+                    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+                    body: JSON.stringify({ status: "received" }),
                 });
                 if (response.status === 404 || response.status === 409) {
                     await loadJobs(destination.value);
@@ -173,5 +152,4 @@
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}

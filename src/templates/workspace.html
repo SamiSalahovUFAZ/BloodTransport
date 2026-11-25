@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block layout %}
+    <header class="workspace-header">
+        <div class="shell app-bar">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-mark" aria-hidden="true"></span>BloodTransport
+            </a>
+            <nav class="workspace-nav" aria-label="Dashboards">
+                {% for endpoint, label in [('index', 'Dispatcher'), ('courier_dashboard', 'Courier'), ('laboratory_dashboard', 'Laboratory')] %}
+                    <a href="{{ url_for(endpoint) }}"{% if request.endpoint == endpoint %} aria-current="page"{% endif %}>{{ label }}</a>
+                {% endfor %}
+            </nav>
+            <form class="account-bar" action="{{ url_for('auth.logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <span class="account-name">{{ session.username }}</span>
+                <button type="submit" class="secondary">Sign out</button>
+            </form>
+        </div>
+    </header>
+    {% block content %}{% endblock %}
+{% endblock %}

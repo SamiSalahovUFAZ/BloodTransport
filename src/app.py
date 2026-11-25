@@ -1,16 +1,26 @@
+from os import environ
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, session
 
+from .accounts import AccountRepository
+from .auth import add_auth
 from .repository import TransportRequestRepository
 
 
 def create_app(database_path=None):
     app = Flask(__name__)
     if database_path is None:
-        database_path = Path(app.instance_path) / "transport.sqlite3"
+        database_path = environ.get("DATABASE_PATH") or Path(app.instance_path) / "transport.sqlite3"
     repository = TransportRequestRepository(database_path)
+    accounts = AccountRepository(database_path)
+    app.secret_key = environ.get("SECRET_KEY") or accounts.session_secret()
+    app.config.update(
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=environ.get("SESSION_COOKIE_SECURE") == "1",
+    )
+    add_auth(app, accounts)
 
     next_status = {
         "pending": "assigned",
@@ -51,7 +61,7 @@ def create_app(database_path=None):
         repository.save(transport_request)
         return jsonify(transport_request), 201
 
-    def apply_status_change(request_id, status, actor, *, courier_name=None):
+    def apply_status_change(request_id, status, *, courier_name=None):
         current = repository.get(request_id)
         if current is None:
             return jsonify(error="Transport request not found."), 404
@@ -66,7 +76,7 @@ def create_app(database_path=None):
             request_id,
             current["status"],
             status,
-            actor,
+            session["username"],
             courier_name=courier_name,
         )
         if updated is None:
@@ -81,16 +91,12 @@ def create_app(database_path=None):
             return jsonify(error="Provide a JSON object."), 400
 
         courier_name = data.get("courier_name")
-        actor = data.get("actor")
         if not isinstance(courier_name, str) or not courier_name.strip():
             return jsonify(error="courier_name is required."), 400
-        if not isinstance(actor, str) or not actor.strip():
-            return jsonify(error="actor is required."), 400
 
         return apply_status_change(
             request_id,
             "assigned",
-            actor.strip(),
             courier_name=courier_name.strip(),
         )
 
@@ -101,13 +107,10 @@ def create_app(database_path=None):
             return jsonify(error="Provide a JSON object."), 400
 
         status = data.get("status")
-        actor = data.get("actor")
         if not isinstance(status, str) or not status.strip():
             return jsonify(error="status is required."), 400
-        if not isinstance(actor, str) or not actor.strip():
-            return jsonify(error="actor is required."), 400
 
-        return apply_status_change(request_id, status, actor.strip())
+        return apply_status_change(request_id, status.strip())
 
     @app.get("/api/transport-requests/<request_id>/history")
     def get_transport_history(request_id):

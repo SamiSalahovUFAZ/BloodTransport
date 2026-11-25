@@ -1,61 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BloodTransport</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #f4f6fa; color: #202b3c; font: 1rem/1.5 system-ui, sans-serif; }
-        header { background: #172842; color: white; padding: 1.5rem 0; border-bottom: 4px solid #dc6678; }
-        header nav, main { width: min(68rem, calc(100% - 2rem)); margin-inline: auto; }
-        header nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
-        header h1 { margin: 0; font-size: 1.65rem; }
-        header a { color: inherit; }
-        .dashboard-links { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
-        main { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.7fr); align-items: start; gap: 1.5rem; padding-block: 2rem; }
-        .panel, .card, dialog { border: 1px solid #dce3ec; border-radius: 1rem; background: white; padding: 1.25rem; }
-        h2 { margin: 0 0 1rem; font-size: 1.25rem; }
-        label { display: grid; gap: .35rem; margin-bottom: 1rem; font-weight: 600; }
-        input, button { border-radius: .55rem; font: inherit; padding: .65rem .8rem; }
-        input { min-width: 0; width: 100%; border: 1px solid #8997aa; }
-        button { border: 1px solid transparent; background: #243e70; color: white; font-weight: 600; cursor: pointer; }
-        button.secondary { background: white; color: #243e70; border-color: #ccd6e3; }
-        button:disabled { opacity: .55; cursor: wait; }
-        :focus-visible { outline: 3px solid #536ebd; outline-offset: 3px; }
-        .error { color: #9e2240; }
-        .muted { color: #546378; }
-        ul { display: grid; gap: .8rem; padding: 0; margin: 0; list-style: none; }
-        .card { overflow-wrap: anywhere; }
-        .card-title, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
-        .card-title { justify-content: space-between; }
-        .card h3 { margin: 0; font-size: 1rem; }
-        .card p { margin: .5rem 0; }
-        .status { padding: .2rem .65rem; border-radius: 999px; background: #edf0f5; font-size: .85rem; font-weight: 650; }
-        .status[data-status="pending"] { background: #fff0cb; color: #704900; }
-        .status[data-status="assigned"] { background: #e7eeff; color: #24457c; }
-        .status[data-status="picked_up"] { background: #efe8ff; color: #53337e; }
-        .status[data-status="delivered"], .status[data-status="received"] { background: #dcf4e7; color: #17543a; }
-        dialog { width: min(28rem, calc(100% - 2rem)); color: inherit; }
-        dialog::backdrop { background: #17284299; }
-        .actions { justify-content: flex-end; }
-        @media (max-width: 44rem) {
-            main { grid-template-columns: 1fr; gap: 1rem; padding-block: 1rem; }
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <nav aria-label="Dashboards">
-            <h1>BloodTransport</h1>
-            <div class="dashboard-links">
-                <a href="{{ url_for('courier_dashboard') }}">Courier dashboard</a>
-                <a href="{{ url_for('laboratory_dashboard') }}">Laboratory dashboard</a>
-            </div>
-        </nav>
-    </header>
-
-    <main>
+{% extends "workspace.html" %}
+{% block title %}Dispatcher dashboard | BloodTransport{% endblock %}
+{% block content %}
+    <main class="shell dispatcher">
+        <section class="page-heading">
+            <h1>Dispatcher dashboard</h1>
+            <p>Create transport requests and assign couriers.</p>
+        </section>
         <form id="request-form" class="panel">
             <h2>New transport request</h2>
             <label>Sample code <input name="sample_code" required></label>
@@ -79,7 +29,6 @@
             <h2 id="assign-heading">Assign courier</h2>
             <p id="assign-sample" class="muted"></p>
             <label>Courier name <input name="courier_name" required></label>
-            <label>Assigned by <input name="actor" required></label>
             <p id="assign-error" class="error" role="alert" hidden></p>
             <div class="actions">
                 <button id="cancel-assign" type="button" class="secondary">Cancel</button>
@@ -87,8 +36,10 @@
             </div>
         </form>
     </dialog>
-
+{% endblock %}
+{% block scripts %}
     <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
         const requestsUrl = "/api/transport-requests";
         const requestForm = document.querySelector("#request-form");
         const createButton = requestForm.querySelector('button[type="submit"]');
@@ -190,7 +141,7 @@
         function postForm(url, form) {
             return fetch(url, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
                 body: JSON.stringify(Object.fromEntries(new FormData(form))),
             });
         }
@@ -232,9 +183,8 @@
             event.preventDefault();
             assignError.hidden = true;
             const courierName = assignForm.elements.namedItem("courier_name").value.trim();
-            const actor = assignForm.elements.namedItem("actor").value.trim();
-            if (!courierName || !actor) {
-                showError(assignError, "Fill in both fields.");
+            if (!courierName) {
+                showError(assignError, "Enter the courier's name.");
                 return;
             }
 
@@ -269,5 +219,4 @@
             createButton.disabled = false;
         });
     </script>
-</body>
-</html>
+{% endblock %}

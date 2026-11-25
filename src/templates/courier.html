@@ -1,23 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Courier dashboard | BloodTransport</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
-</head>
-<body>
-    <header>
-        <nav class="shell" aria-label="Dashboards">
-            <strong>BloodTransport</strong>
-            <div class="dashboard-links">
-                <a href="{{ url_for('index') }}">Dispatcher dashboard</a>
-                <a href="{{ url_for('laboratory_dashboard') }}">Laboratory dashboard</a>
-            </div>
-        </nav>
-    </header>
+{% extends "workspace.html" %}
+{% block title %}Courier dashboard | BloodTransport{% endblock %}
+{% block content %}
     <main class="shell">
-        <h1>Courier dashboard</h1>
+        <section class="page-heading">
+            <h1>Courier dashboard</h1>
+            <p>Find your assignments and record pickup or delivery.</p>
+        </section>
         <form id="courier-filter">
             <label for="courier-name">Courier name
                 <input id="courier-name" placeholder="Name entered by the dispatcher" required>
@@ -31,7 +19,10 @@
             <div id="jobs"></div>
         </section>
     </main>
+{% endblock %}
+{% block scripts %}
     <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
         const form = document.querySelector("#courier-filter");
         const input = document.querySelector("#courier-name");
         const filterButton = form.querySelector("button");
@@ -106,8 +97,8 @@
             try {
                 const response = await fetch(endpoint + "/" + encodeURIComponent(job.id) + "/status", {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status, actor: job.courier_name }),
+                    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+                    body: JSON.stringify({ status }),
                 });
                 if (response.status === 404 || response.status === 409) {
                     await loadJobs(input.value);
@@ -150,5 +141,4 @@
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}
