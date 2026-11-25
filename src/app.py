@@ -128,6 +128,10 @@ def create_app(database_path=None):
     def index():
         return render_template("index.html")
 
+    @app.get("/courier")
+    def courier_dashboard():
+        return render_template("courier.html")
+
     return app
 
 
