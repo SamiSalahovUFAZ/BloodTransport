@@ -1,0 +1,15 @@
+{% extends "workspace.html" %}
+{% block title %}QR labels | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations">
+    <header class="operations-heading"><div><a class="tool-back" href="{{ url_for('workspace_tools.hub') }}">← Tools</a><h1>QR labels</h1><p>Find a shipment and print its tracking label.</p></div></header>
+    <section class="queue tool-panel">
+        <form class="tool-toolbar" method="get"><label>Sample code <input name="q" type="search" value="{{ query }}" placeholder="e.g. BT-204"></label><button type="submit">Find label</button></form>
+        <ul class="tool-list">
+            {% for job in jobs %}
+            <li class="tool-list-row"><div><strong>{{ job.sample_code }}</strong><p class="muted">{{ job.origin }} → {{ job.destination }} · {{ stage_labels[job.status] }}</p></div><a class="tool-link-button" href="{{ url_for('workspace_tools.label', request_id=job.id) }}">Preview label</a></li>
+            {% else %}<li class="muted">No matching requests.</li>{% endfor %}
+        </ul>
+    </section>
+</main>
+{% endblock %}

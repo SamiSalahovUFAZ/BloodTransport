@@ -33,6 +33,8 @@ The collection is `/api/transport-requests`. Mutations require a session and CSR
 
 SQLite stores accounts, transport requests, status history and issues. Status, history and receipt issues are updated in one transaction. The current revision prevents stale user actions from overwriting changes.
 
+The workspace tools group role-scoped data into a daily planner, an incident centre and printable QR labels. A QR label contains a tracking URL. The tracking page applies the same login and access rules as the request API.
+
 ## Patterns used by the application
 
 | Pattern | Code | Application |

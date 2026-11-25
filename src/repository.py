@@ -185,6 +185,16 @@ class TransportRequestRepository:
             """, (request_id,)).fetchall()
         return [dict(row) for row in rows]
 
+    def incident_feed(self):
+        with closing(sqlite3.connect(self.database_path)) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute("""
+                SELECT id, request_id, description, reported_by, reported_at, resolved_by, resolved_at
+                FROM transport_incidents
+                ORDER BY resolved_at IS NOT NULL, id DESC
+            """).fetchall()
+        return [dict(row) for row in rows]
+
     def report_incident(self, request_id, description, actor):
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
             result = connection.execute("""

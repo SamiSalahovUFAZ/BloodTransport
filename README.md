@@ -23,6 +23,8 @@ The dispatcher dashboard includes a summary of transport activity, search and fi
 
 The request form also records container count, scheduled pickup, pickup and delivery contacts, and handoff instructions. Dispatchers can edit, reassign, or cancel a request before pickup. Cancellation requires a reason. Couriers can add a note when recording pickup or delivery, and all three teams can review the handoff history for requests they can access.
 
+Open **Tools** from any workspace to use the shift planner, incident centre, or printable QR labels. The planner uses the viewer's local time. A QR code links to a tracking page, which requires an account with access to the request.
+
 Each signed-in account opens its own workspace. The API enforces the role and limits courier and laboratory records to their assignments and registered destinations. Existing accounts choose their role once at sign-in. Registration is self-service for the classroom demo, so role and laboratory ownership are not verified.
 
 ## Tests

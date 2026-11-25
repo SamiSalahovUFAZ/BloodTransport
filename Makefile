@@ -16,6 +16,7 @@ check:
 	$(PYTHON) -m ruff check src tests
 	node --check src/static/dispatcher.js
 	node --check src/static/role-queue.js
+	node --check src/static/workspace-tools.js
 	$(MAKE) test
 
 up:

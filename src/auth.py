@@ -30,6 +30,7 @@ def add_auth(app, accounts):
         if request.endpoint is None:
             return None
         is_api = request.path.startswith("/api/")
+        tracking_id = request.view_args.get("request_id") if request.endpoint == "workspace_tools.track" else None
         if request.endpoint not in {"static", "health"}:
             username = session.get("username")
             g.account = accounts.find(username) if username else None
@@ -39,10 +40,14 @@ def add_auth(app, accounts):
                 if g.account is None:
                     if is_api:
                         return jsonify(error="Sign in to continue."), 401
+                    if tracking_id and len(tracking_id) <= 36:
+                        session["tracking_return"] = tracking_id
                     return redirect(url_for("auth.login"))
                 if g.account["role"] is None and request.endpoint not in {"auth.setup_role", "auth.logout"}:
                     if is_api:
                         return jsonify(error="Choose a workspace role first."), 403
+                    if tracking_id and len(tracking_id) <= 36:
+                        session["tracking_return"] = tracking_id
                     return redirect(url_for("auth.setup_role"))
 
         if request.method not in READ_METHODS:
@@ -64,10 +69,16 @@ def add_auth(app, accounts):
             response.headers["Cache-Control"] = "no-store"
         return response
 
+    def workspace_destination(tracking_return):
+        if tracking_return:
+            return redirect(url_for("workspace_tools.track", request_id=tracking_return), code=303)
+        return redirect(url_for("index"), code=303)
+
     def sign_in(username):
+        tracking_return = session.get("tracking_return")
         session.clear()
         session["username"] = username
-        return redirect(url_for("index"), code=303)
+        return workspace_destination(tracking_return)
 
     def role_selection():
         role = request.form.get("role", "")
@@ -133,7 +144,7 @@ def add_auth(app, accounts):
         if error:
             return render_template("auth.html", setting_up=True, role=role, facility=facility, error=error), 400
         accounts.set_initial_role(g.account["username"], role, facility)
-        return redirect(url_for("index"), code=303)
+        return workspace_destination(session.pop("tracking_return", None))
 
     @auth.post("/logout")
     def logout():

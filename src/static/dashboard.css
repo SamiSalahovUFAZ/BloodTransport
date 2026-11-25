@@ -239,3 +239,45 @@ textarea { resize: vertical; }
     .account-avatar { display: none; }
     .plan-fields { grid-template-columns: 1fr; }
 }
+
+.tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.tool-grid.planner-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tool-card { display: grid; align-content: start; gap: .55rem; padding: 1.35rem; border: 1px solid var(--rule); border-radius: 1rem; background: #fff; color: var(--ink); text-decoration: none; box-shadow: var(--shadow); }
+.tool-card:hover { border-color: #7896b0; background: #fbfdff; }
+.tool-card h2, .tool-card p { margin: 0; }
+.tool-card p { color: var(--muted); }
+.tool-card > span:last-child { color: var(--primary); font-weight: 700; margin-top: .35rem; }
+.tool-icon { display: grid; place-items: center; width: 2.65rem; height: 2.65rem; border-radius: .7rem; background: #e7f1fa; color: #245478; font-size: 1.25rem; font-weight: 750; }
+.tool-icon.issue-icon { background: #faebef; color: #97344d; }
+.tool-icon.label-icon { background: #e4f5ed; color: #27674e; }
+.tool-back { color: #d2e1ef; display: inline-block; margin-bottom: .4rem; font-size: .9rem; }
+.tool-panel { padding: 1.15rem; min-width: 0; }
+.tool-heading, .tool-toolbar, .tool-tabs { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; }
+.tool-heading { justify-content: space-between; align-items: center; }
+.tool-heading h2 { margin: 0; }
+.tool-tabs a { padding: .45rem .65rem; border-radius: .5rem; }
+.tool-tabs a[aria-current="page"] { background: #e7f1fa; font-weight: 700; }
+.tool-list { display: grid; gap: .4rem; padding: 0; margin: .55rem 0 0; list-style: none; }
+.tool-list li { padding: .65rem 0; border-top: 1px solid var(--rule); overflow-wrap: anywhere; }
+.tool-list p { margin: .3rem 0; }
+.tool-list time { display: inline-block; margin-right: .45rem; }
+.tool-list span { margin-left: .45rem; }
+.tool-list-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .35rem; }
+.tool-link-button { display: inline-block; padding: .45rem .7rem; border: 1px solid var(--rule); border-radius: .5rem; background: #fff; color: var(--primary); font-weight: 650; text-decoration: none; }
+.unplanned { margin-top: 1rem; }
+.unplanned summary { cursor: pointer; font-weight: 700; }
+.print-label { display: flex; align-items: center; flex-wrap: wrap; gap: 1.1rem; width: fit-content; max-width: 100%; padding: 1.05rem; border: 1px dashed #586d80; border-radius: .55rem; background: #fff; overflow-wrap: anywhere; }
+.print-label h2, .print-label p { margin: .25rem 0; }
+.print-label img { flex-shrink: 0; }
+.issue-description { white-space: pre-wrap; }
+@media (max-width: 50rem) {
+    .tool-grid, .tool-grid.planner-grid { grid-template-columns: 1fr; }
+}
+@media print {
+    body, .queue { background: #fff; color: #000; box-shadow: none; }
+    .workspace-header, .tool-toolbar, .operations-heading [data-print], .tool-back, .label-tracking-link { display: none; }
+    .operations-heading { background: transparent; color: #000; padding: 0; min-height: 0; }
+    .operations-heading p { color: #000; }
+    .label-page .operations-heading { display: none; }
+    .print-label { break-inside: avoid; }
+}
