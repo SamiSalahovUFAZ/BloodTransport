@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from os import environ
 from pathlib import Path
 from uuid import uuid4
@@ -46,17 +47,36 @@ def create_app(database_path=None):
         details = {}
         for field in ("sample_code", "origin", "destination"):
             value = data.get(field)
-            if not isinstance(value, str) or not value.strip():
-                return jsonify(error=f"{field} is required."), 400
+            if not isinstance(value, str) or not 1 <= len(value.strip()) <= 100:
+                return jsonify(error=f"{field} must contain 1–100 characters."), 400
             details[field] = value.strip()
 
         if details["origin"].casefold() == details["destination"].casefold():
             return jsonify(error="Origin and destination must differ."), 400
 
+        priority = data.get("priority", "standard")
+        if priority not in ("standard", "urgent", "critical"):
+            return jsonify(error="Choose a valid priority."), 400
+
+        due_at = data.get("due_at")
+        if due_at is not None:
+            if not isinstance(due_at, str):
+                return jsonify(error="Delivery deadline must include a time zone."), 400
+            try:
+                deadline = datetime.fromisoformat(due_at.replace("Z", "+00:00"))
+                if deadline.utcoffset() is None:
+                    raise ValueError("No time zone")
+                due_at = deadline.astimezone(timezone.utc).isoformat(timespec="seconds")
+            except (ValueError, OverflowError):
+                return jsonify(error="Delivery deadline must include a valid time and time zone."), 400
+
         transport_request = {
             "id": str(uuid4()),
             **details,
             "status": "pending",
+            "priority": priority,
+            "due_at": due_at,
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
         repository.save(transport_request)
         return jsonify(transport_request), 201
@@ -117,7 +137,24 @@ def create_app(database_path=None):
         if repository.get(request_id) is None:
             return jsonify(error="Transport request not found."), 404
 
-        return jsonify(history=repository.history(request_id))
+        return jsonify(history=repository.history(request_id), incidents=repository.incidents(request_id))
+
+    @app.post("/api/transport-requests/<request_id>/incidents")
+    def report_transport_incident(request_id):
+        data = request.get_json(silent=True)
+        description = data.get("description") if isinstance(data, dict) else None
+        if not isinstance(description, str) or not 1 <= len(description.strip()) <= 500:
+            return jsonify(error="Describe the issue in 1–500 characters."), 400
+        if repository.get(request_id) is None:
+            return jsonify(error="Transport request not found."), 404
+        incident_id = repository.report_incident(request_id, description.strip(), session["username"])
+        return jsonify(id=incident_id), 201
+
+    @app.patch("/api/transport-requests/<request_id>/incidents/<int:incident_id>/resolve")
+    def resolve_transport_incident(request_id, incident_id):
+        if not repository.resolve_incident(request_id, incident_id, session["username"]):
+            return jsonify(error="Issue is already resolved or could not be found."), 409
+        return jsonify(resolved=True)
 
     @app.get("/api/transport-requests/<request_id>")
     def get_transport_request(request_id):

@@ -18,6 +18,8 @@ Open [http://127.0.0.1:5001/](http://127.0.0.1:5001/) and choose **Create an acc
 2. In **Courier**, filter by `Alex` and mark the sample as picked up, then delivered.
 3. In **Laboratory**, filter by `Central Lab` and confirm receipt. The signed-in username is recorded with every status change.
 
+The dispatcher dashboard includes a summary of transport activity, search and filters, optional delivery deadlines, and CSV export of the current view. Open a request's details to see status changes, report an issue, or resolve a reported issue.
+
 All signed-in users share the demo workspace. Courier and laboratory filters help users find assignments. The application does not implement per-role access control.
 
 ## Tests

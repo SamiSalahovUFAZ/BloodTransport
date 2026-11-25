@@ -24,10 +24,17 @@ class TransportRequestRepository:
             columns = connection.execute(
                 "PRAGMA table_info(transport_requests)"
             ).fetchall()
-            if "courier_name" not in {column[1] for column in columns}:
-                connection.execute(
-                    "ALTER TABLE transport_requests ADD COLUMN courier_name TEXT"
-                )
+            existing_columns = {column[1] for column in columns}
+            for name, definition in (
+                ("courier_name", "TEXT"),
+                ("priority", "TEXT NOT NULL DEFAULT 'standard'"),
+                ("due_at", "TEXT"),
+                ("created_at", "TEXT"),
+            ):
+                if name not in existing_columns:
+                    connection.execute(
+                        f"ALTER TABLE transport_requests ADD COLUMN {name} {definition}"
+                    )
 
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS transport_history (
@@ -38,6 +45,21 @@ class TransportRequestRepository:
                     actor TEXT NOT NULL,
                     changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS transport_incidents (
+                    id INTEGER PRIMARY KEY,
+                    request_id TEXT NOT NULL REFERENCES transport_requests(id),
+                    description TEXT NOT NULL,
+                    reported_by TEXT NOT NULL,
+                    reported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    resolved_by TEXT,
+                    resolved_at TEXT
+                )
+            """)
+            connection.execute("""
+                CREATE INDEX IF NOT EXISTS transport_incidents_by_request
+                ON transport_incidents (request_id, resolved_at)
             """)
 
     @staticmethod
@@ -50,8 +72,10 @@ class TransportRequestRepository:
     def save(self, transport_request):
         with closing(sqlite3.connect(self.database_path)) as connection, connection:
             connection.execute("""
-                INSERT INTO transport_requests (id, sample_code, origin, destination, status)
-                VALUES (:id, :sample_code, :origin, :destination, :status)
+                INSERT INTO transport_requests
+                    (id, sample_code, origin, destination, status, priority, due_at, created_at)
+                VALUES
+                    (:id, :sample_code, :origin, :destination, :status, :priority, :due_at, :created_at)
             """, transport_request)
 
     def get(self, request_id):
@@ -67,7 +91,14 @@ class TransportRequestRepository:
         with closing(sqlite3.connect(self.database_path)) as connection:
             connection.row_factory = sqlite3.Row
             rows = connection.execute(
-                "SELECT * FROM transport_requests ORDER BY rowid DESC"
+                """
+                SELECT request.*, (
+                    SELECT COUNT(*) FROM transport_incidents AS incident
+                    WHERE incident.request_id = request.id AND incident.resolved_at IS NULL
+                ) AS open_incidents
+                FROM transport_requests AS request
+                ORDER BY request.rowid DESC
+                """
             ).fetchall()
 
         return [self._request_from_row(row) for row in rows]
@@ -106,3 +137,30 @@ class TransportRequestRepository:
             """, (request_id,)).fetchall()
 
         return [dict(row) for row in rows]
+
+    def incidents(self, request_id):
+        with closing(sqlite3.connect(self.database_path)) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute("""
+                SELECT id, description, reported_by, reported_at, resolved_by, resolved_at
+                FROM transport_incidents
+                WHERE request_id = ? ORDER BY id DESC
+            """, (request_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def report_incident(self, request_id, description, actor):
+        with closing(sqlite3.connect(self.database_path)) as connection, connection:
+            result = connection.execute("""
+                INSERT INTO transport_incidents (request_id, description, reported_by)
+                VALUES (?, ?, ?)
+            """, (request_id, description, actor))
+            return result.lastrowid
+
+    def resolve_incident(self, request_id, incident_id, actor):
+        with closing(sqlite3.connect(self.database_path)) as connection, connection:
+            result = connection.execute("""
+                UPDATE transport_incidents
+                SET resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
+                WHERE request_id = ? AND id = ? AND resolved_at IS NULL
+            """, (actor, request_id, incident_id))
+            return result.rowcount == 1
