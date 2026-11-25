@@ -1,0 +1,23 @@
+{% extends "workspace.html" %}
+{% block title %}Shift planner | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations" id="shift-planner">
+    <header class="operations-heading"><div><a class="tool-back" href="{{ url_for('workspace_tools.hub') }}">← Tools</a><h1>Shift planner</h1><p>Pickups and delivery deadlines, displayed in your local time.</p></div><button type="button" data-print class="secondary">Print plan</button></header>
+    <div class="tool-toolbar">
+        <button id="previous-day" type="button" class="secondary">Previous</button>
+        <label>Shift date <input id="shift-date" type="date" required></label>
+        <button id="next-day" type="button" class="secondary">Next</button>
+        <button id="shift-today" type="button" class="secondary">Today</button>
+    </div>
+    <p id="shift-summary" class="muted" role="status"></p>
+    <div class="tool-grid planner-grid">
+        <section class="queue tool-panel"><h2>Scheduled pickups</h2><ol id="shift-pickups" class="tool-list"></ol></section>
+        <section class="queue tool-panel"><h2>Delivery deadlines</h2><ol id="shift-deliveries" class="tool-list"></ol></section>
+    </div>
+    <details class="queue tool-panel unplanned"><summary>Active requests without a schedule <span id="unscheduled-count" class="muted"></span></summary><ul id="unscheduled-list" class="tool-list"></ul></details>
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="application/json" id="shift-data">[{% for job in jobs %}{{ {"code": job.sample_code, "origin": job.origin, "destination": job.destination, "status": job.status, "label": stage_labels[job.status], "pickup": job.pickup_at, "delivery": job.due_at, "url": url_for('workspace_tools.track', request_id=job.id)} | tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script src="{{ url_for('static', filename='workspace-tools.js') }}" defer></script>
+{% endblock %}

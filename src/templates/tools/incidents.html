@@ -1,0 +1,33 @@
+{% extends "workspace.html" %}
+{% block title %}Incident centre | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations">
+    <header class="operations-heading"><div><a class="tool-back" href="{{ url_for('workspace_tools.hub') }}">← Tools</a><h1>Incident centre</h1><p>{{ open_count }} open · {{ total - open_count }} resolved</p></div></header>
+    <section class="queue tool-panel" aria-labelledby="incident-queue">
+        <div class="tool-heading"><h2 id="incident-queue">Issues and delays</h2><nav class="tool-tabs" aria-label="Incident status">
+            {% for value, label in [('open', 'Open'), ('resolved', 'Resolved'), ('all', 'All')] %}
+            <a href="{{ url_for('workspace_tools.incidents', status=value) }}"{% if status == value %} aria-current="page"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </nav></div>
+        <p id="tool-error" class="error" role="alert" hidden></p>
+        <ul class="tool-list incident-feed">
+        {% for issue in incidents %}
+            {% set job = jobs[issue.request_id] %}
+            <li>
+                <div><a href="{{ url_for('workspace_tools.track', request_id=job.id) }}"><strong>{{ job.sample_code }}</strong></a> <span class="muted">{{ job.origin }} → {{ job.destination }}</span></div>
+                <p class="issue-description">{{ issue.description }}</p>
+                <p class="muted">Reported by {{ issue.reported_by }} · <time>{{ issue.reported_at }} UTC</time></p>
+                {% if issue.resolved_at %}
+                    <span class="resolution">Resolved by {{ issue.resolved_by }} · <time>{{ issue.resolved_at }} UTC</time></span>
+                {% elif g.account.role == 'dispatcher' %}
+                    <button type="button" class="secondary" data-resolve="{{ url_for('resolve_transport_incident', request_id=job.id, incident_id=issue.id) }}">Resolve issue</button>
+                {% endif %}
+            </li>
+        {% else %}
+            <li class="muted">No incidents match this view.</li>
+        {% endfor %}
+        </ul>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='workspace-tools.js') }}" defer></script>{% endblock %}

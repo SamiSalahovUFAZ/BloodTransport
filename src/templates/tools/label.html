@@ -1,0 +1,12 @@
+{% extends "workspace.html" %}
+{% block title %}Label {{ job.sample_code }} | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations label-page">
+    <header class="operations-heading"><div><a class="tool-back" href="{{ url_for('workspace_tools.labels') }}">← QR labels</a><h1>Print label</h1><p>Scan the code to open the request in BloodTransport.</p></div><button type="button" data-print class="secondary">Print label</button></header>
+    <section class="print-label" aria-label="Printable sample label">
+        <img width="160" height="160" src="{{ url_for('workspace_tools.qr_code', request_id=job.id) }}" alt="QR code for the tracking page">
+        <div><span class="muted">BloodTransport</span><h2>{{ job.sample_code }}</h2><p>{{ sample_types[job.sample_type] }} · {{ job.container_count }} container{% if job.container_count != 1 %}s{% endif %}</p><p>{{ job.origin }} → {{ job.destination }}</p><a class="label-tracking-link" href="{{ url_for('workspace_tools.track', request_id=job.id) }}">Open tracking page</a></div>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='workspace-tools.js') }}" defer></script>{% endblock %}

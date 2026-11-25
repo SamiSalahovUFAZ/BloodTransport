@@ -1,0 +1,26 @@
+{% extends "workspace.html" %}
+{% block title %}Tracking {{ job.sample_code }} | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations">
+    <header class="operations-heading"><div><a class="tool-back" href="{{ url_for('workspace_tools.hub') }}">← Tools</a><h1>{{ job.sample_code }}</h1><p>{{ job.origin }} → {{ job.destination }}</p></div><a class="tool-link-button" href="{{ url_for('workspace_tools.label', request_id=job.id) }}">Print QR label</a></header>
+    <div class="tool-grid planner-grid">
+        <section class="queue tool-panel"><h2>Transport details</h2>
+            <p><span class="status" data-status="{{ job.status }}">{{ stage_labels[job.status] }}</span></p>
+            <dl class="role-facts">
+                <dt>Sample type</dt><dd>{{ sample_types[job.sample_type] }}</dd><dt>Containers</dt><dd>{{ job.container_count }}</dd>
+                <dt>Courier</dt><dd>{{ job.courier_name | default('Unassigned') }}</dd>
+                {% if job.instructions %}<dt>Instructions</dt><dd>{{ job.instructions }}</dd>{% endif %}
+                {% if job.receipt_note %}<dt>Receipt note</dt><dd>{{ job.receipt_note }}</dd>{% endif %}
+            </dl>
+        </section>
+        <section class="queue tool-panel"><h2>Handoff history</h2><ol class="timeline">
+            {% for event in events %}<li><strong>{{ stage_labels[event.status] }}</strong><span>{{ event.actor }} · {{ event.changed_at }} UTC</span>{% if event.note %}<p>{{ event.note }}</p>{% endif %}</li>
+            {% else %}<li class="muted">No handoffs recorded yet.</li>{% endfor %}
+        </ol></section>
+        <section class="queue tool-panel"><h2>Issues</h2><ul class="tool-list">
+            {% for issue in incidents %}<li><strong>{{ 'Resolved' if issue.resolved_at else 'Open' }}</strong><p class="issue-description">{{ issue.description }}</p><span class="muted">{{ issue.reported_by }} · {{ issue.reported_at }} UTC</span></li>
+            {% else %}<li class="muted">No issues reported.</li>{% endfor %}
+        </ul></section>
+    </div>
+</main>
+{% endblock %}

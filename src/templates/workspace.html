@@ -6,7 +6,8 @@
                 <span class="brand-mark" aria-hidden="true"></span>BloodTransport
             </a>
             <nav class="workspace-nav" aria-label="Workspace">
-                <a href="{{ url_for('index') }}" aria-current="page"><span class="workspace-dot" aria-hidden="true"></span>{{ role_labels[g.account.role] }} workspace</a>
+                <a href="{{ url_for('index') }}"{% if request.blueprint != 'workspace_tools' %} aria-current="page"{% endif %}><span class="workspace-dot" aria-hidden="true"></span>{{ role_labels[g.account.role] }} workspace</a>
+                <a href="{{ url_for('workspace_tools.hub') }}"{% if request.blueprint == 'workspace_tools' %} aria-current="page"{% endif %}>Tools</a>
             </nav>
             <form class="account-bar" action="{{ url_for('auth.logout') }}" method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

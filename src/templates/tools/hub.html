@@ -1,0 +1,12 @@
+{% extends "workspace.html" %}
+{% block title %}Tools | BloodTransport{% endblock %}
+{% block content %}
+<main class="shell operations">
+    <header class="operations-heading"><div><h1>Workspace tools</h1><p>Plan a shift, follow up on issues, and label consignments.</p></div></header>
+    <div class="tool-grid">
+        <a class="tool-card" href="{{ url_for('workspace_tools.planner') }}"><span class="tool-icon" aria-hidden="true">◷</span><h2>Shift planner</h2><p>Review scheduled pickups and delivery deadlines for a chosen day.</p><span>Open planner →</span></a>
+        <a class="tool-card" href="{{ url_for('workspace_tools.incidents') }}"><span class="tool-icon issue-icon" aria-hidden="true">!</span><h2>Incident centre</h2><p>See open and resolved issues alongside their transport requests.</p><span>View incidents →</span></a>
+        <a class="tool-card" href="{{ url_for('workspace_tools.labels') }}"><span class="tool-icon label-icon" aria-hidden="true">▦</span><h2>QR labels</h2><p>Print a label that opens a transport record in BloodTransport.</p><span>Find a label →</span></a>
+    </div>
+</main>
+{% endblock %}

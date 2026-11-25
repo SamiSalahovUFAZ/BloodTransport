@@ -10,6 +10,7 @@ from .auth import add_auth
 from .repository import TransportRequestRepository
 from .roles import SAMPLE_TYPES, can_view, role_required
 from .workflow import EDITABLE_STAGES, allows_transition
+from .workspace_tools import register_workspace_tools
 
 
 def read_plan(data):
@@ -64,6 +65,7 @@ def create_app(database_path=None):
     )
     add_auth(app, accounts)
     app.jinja_env.globals["sample_types"] = SAMPLE_TYPES
+    register_workspace_tools(app, repository)
 
     @app.get("/health")
     def health():
